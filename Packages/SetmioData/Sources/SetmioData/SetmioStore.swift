@@ -471,7 +471,7 @@ public actor SetmioStore { // VERIFY: @ModelActor on a public actor generates a 
             record.linkedSessionID = session.id
             modelContext.insert(record)
             try commit()
-            return .linkedToSession(ID(session.id))
+            return .linkedToSession(SetmioCore.ID(session.id))
         }
 
         let placeholder = LoggedSession(
@@ -868,7 +868,7 @@ public actor SetmioStore { // VERIFY: @ModelActor on a public actor generates a 
 
         for incoming in sets {
             var set = incoming
-            set.sessionID = ID(sessionUUID)
+            set.sessionID = SetmioCore.ID(sessionUUID)
             let setUUID = set.id.rawValue
             seen.insert(setUUID)
             if let row = existingByID[setUUID] {

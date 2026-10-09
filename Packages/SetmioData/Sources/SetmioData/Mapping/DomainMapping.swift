@@ -127,7 +127,7 @@ extension ExerciseEntity {
     public func toDomain() throws -> Exercise {
         let entity = "ExerciseEntity"
         return Exercise(
-            id: ID(id),
+            id: SetmioCore.ID(id),
             nameZH: nameZH,
             nameEN: nameEN,
             primary: try primaryRaw.map { try RawMap.decode($0, as: MuscleGroup.self, entity: entity, field: "primaryRaw") },
@@ -157,7 +157,7 @@ extension ProgramTemplateEntity {
 
     public func toDomain() throws -> ProgramTemplate {
         ProgramTemplate(
-            id: ID(id),
+            id: SetmioCore.ID(id),
             nameZH: nameZH,
             daysPerWeek: daysPerWeek,
             days: try JSONBlob.decode([ProgramDay].self, from: daysJSON),
@@ -182,8 +182,8 @@ extension MesocycleEntity {
 
     public func toDomain() throws -> Mesocycle {
         Mesocycle(
-            id: ID(id),
-            templateID: ID(templateID),
+            id: SetmioCore.ID(id),
+            templateID: SetmioCore.ID(templateID),
             startDay: DayKey(sortKey: startDay),
             weeks: try JSONBlob.decode([MesocycleWeek].self, from: weeksJSON),
             currentWeekIndex: currentWeekIndex,
@@ -208,8 +208,8 @@ extension PlannedSessionEntity {
 
     public func toDomain() throws -> PlannedSession {
         PlannedSession(
-            id: ID(id),
-            mesocycleID: mesocycleID.map { ID($0) },
+            id: SetmioCore.ID(id),
+            mesocycleID: mesocycleID.map { SetmioCore.ID($0) },
             day: DayKey(sortKey: day),
             dayNameZH: dayNameZH,
             exercises: try JSONBlob.decode([PlannedExercise].self, from: exercisesJSON),
@@ -251,8 +251,8 @@ extension LoggedSessionEntity {
             a.completedAt == b.completedAt ? a.setIndex < b.setIndex : a.completedAt < b.completedAt
         }
         return LoggedSession(
-            id: ID(id),
-            plannedSessionID: plannedSessionID.map { ID($0) },
+            id: SetmioCore.ID(id),
+            plannedSessionID: plannedSessionID.map { SetmioCore.ID($0) },
             start: start,
             end: end,
             sets: try orderedSets.map { try $0.toDomain() },
@@ -287,9 +287,9 @@ extension LoggedSetEntity {
 
     public func toDomain() throws -> LoggedSet {
         LoggedSet(
-            id: ID(id),
-            sessionID: ID(sessionID),
-            exerciseID: ID(exerciseID),
+            id: SetmioCore.ID(id),
+            sessionID: SetmioCore.ID(sessionID),
+            exerciseID: SetmioCore.ID(exerciseID),
             index: setIndex,
             load: load,
             reps: reps,
@@ -395,7 +395,7 @@ extension BodyMeasurementEntity {
     }
 
     public func toDomain() throws -> BodyMeasurement {
-        BodyMeasurement(id: ID(id), hkUUID: hkUUID, date: date, weight: weight, bodyFat: bodyFat, leanMass: leanMass, source: source)
+        BodyMeasurement(id: SetmioCore.ID(id), hkUUID: hkUUID, date: date, weight: weight, bodyFat: bodyFat, leanMass: leanMass, source: source)
     }
 }
 
@@ -425,7 +425,7 @@ extension ImportedWorkoutEntity {
             totalEnergy: totalEnergy,
             effortScore: effortScore,
             sourceBundleID: sourceBundleID,
-            setmioSessionID: linkedSessionID.map { ID($0) }
+            setmioSessionID: linkedSessionID.map { SetmioCore.ID($0) }
         )
     }
 }
@@ -450,7 +450,7 @@ extension FoodEntryEntity {
 
     public func toDomain() throws -> FoodEntry {
         FoodEntry(
-            id: ID(id),
+            id: SetmioCore.ID(id),
             day: DayKey(sortKey: day),
             time: time,
             meal: try RawMap.decode(mealRaw, as: MealType.self, entity: "FoodEntryEntity", field: "mealRaw"),
@@ -487,7 +487,7 @@ extension FoodItemEntity {
 
     public func toDomain() throws -> FoodItem {
         FoodItem(
-            id: ID(id),
+            id: SetmioCore.ID(id),
             nameZH: nameZH,
             nameEN: nameEN,
             portionGrams: portionGrams,
@@ -547,7 +547,7 @@ extension MedicationEntity {
 
     public func toDomain() throws -> Medication {
         Medication(
-            id: ID(id),
+            id: SetmioCore.ID(id),
             drug: try RawMap.decode(drugRaw, as: DrugID.self, entity: "MedicationEntity", field: "drugRaw"),
             form: try JSONBlob.decode(DosageForm.self, from: formJSON),
             startedOn: DayKey(sortKey: startedOn),
@@ -577,12 +577,12 @@ extension DoseLogEntity {
 
     public func toDomain() throws -> DoseLog {
         DoseLog(
-            id: ID(id),
-            medicationID: ID(medicationID),
+            id: SetmioCore.ID(id),
+            medicationID: SetmioCore.ID(medicationID),
             takenAt: takenAt,
             doseMg: doseMg,
             site: try RawMap.decodeOptional(siteRaw, as: InjectionSite.self, entity: "DoseLogEntity", field: "siteRaw"),
-            penID: penID.map { ID($0) },
+            penID: penID.map { SetmioCore.ID($0) },
             wasMissedMakeup: wasMissedMakeup,
             hkDoseEventUUID: hkDoseEventUUID,
             note: note
@@ -608,8 +608,8 @@ extension PenInventoryEntity {
 
     public func toDomain() throws -> PenInventory {
         PenInventory(
-            id: ID(id),
-            medicationID: ID(medicationID),
+            id: SetmioCore.ID(id),
+            medicationID: SetmioCore.ID(medicationID),
             strengthMg: strengthMg,
             dosesRemaining: dosesRemaining,
             firstUsedAt: firstUsedAt,
@@ -636,8 +636,8 @@ extension SideEffectLogEntity {
 
     public func toDomain() throws -> SideEffectLog {
         SideEffectLog(
-            id: ID(id),
-            medicationID: ID(medicationID),
+            id: SetmioCore.ID(id),
+            medicationID: SetmioCore.ID(medicationID),
             day: DayKey(sortKey: day),
             kind: try RawMap.decode(kindRaw, as: SideEffectLog.Kind.self, entity: "SideEffectLogEntity", field: "kindRaw"),
             severity: severity,
@@ -665,8 +665,8 @@ extension GLP1PlanEntity {
 
     public func toDomain() throws -> GLP1Plan {
         GLP1Plan(
-            id: ID(id),
-            medicationID: ID(medicationID),
+            id: SetmioCore.ID(id),
+            medicationID: SetmioCore.ID(medicationID),
             drug: try RawMap.decode(drugRaw, as: DrugID.self, entity: "GLP1PlanEntity", field: "drugRaw"),
             labelVersion: labelVersion,
             steps: try JSONBlob.decode([GLP1PlanStep].self, from: stepsJSON),

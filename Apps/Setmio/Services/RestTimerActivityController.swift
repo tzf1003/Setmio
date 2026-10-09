@@ -28,11 +28,13 @@ final class RestTimerActivityController {
         guard isEnabled else { return }
         let content = ActivityContent(state: state, staleDate: state.endDate.addingTimeInterval(120))
 
-        if let activity,
-           activity.activityState == .active,
-           activity.attributes.sessionID == sessionID,
-           activity.attributes.exerciseName == exerciseName {
-            await activity.update(content)
+        if let current = activity,
+           current.activityState == .active,
+           current.attributes.sessionID == sessionID,
+           current.attributes.exerciseName == exerciseName {
+            // Activity is not Sendable; it is only ever touched from this main-actor object.
+            nonisolated(unsafe) let unsafeActivity = current
+            await unsafeActivity.update(content)
             return
         }
 
@@ -50,9 +52,10 @@ final class RestTimerActivityController {
     }
 
     func end() async {
-        guard let activity else { return }
-        await activity.end(nil, dismissalPolicy: .immediate)
+        guard let current = activity else { return }
         self.activity = nil
+        nonisolated(unsafe) let unsafeActivity = current
+        await unsafeActivity.end(nil, dismissalPolicy: .immediate)
     }
 
     /// Ends activities left over from a previous process (e.g. after a crash mid-workout).

@@ -17,9 +17,8 @@ public enum HealthTypes {
         case .restingHeartRate: return .restingHeartRate
         case .hrvSDNN: return .heartRateVariabilitySDNN
         case .hrvRMSSD:
-            if #available(iOS 27, watchOS 27, *) {
-                return .heartRateVariabilityRMSSD // VERIFY: exact HKQuantityTypeIdentifier name for RMSSD in the iOS 27 SDK; remove this branch if the SDK has no such identifier (RMSSD is then computed from HKHeartbeatSeries only)
-            }
+            // The iOS 26.x SDK has no RMSSD quantity type (verified against Xcode 26.6 in CI); RMSSD is computed
+            // locally from HKHeartbeatSeriesSample beat-to-beat intervals instead. Revisit when building with iOS 27.
             return nil
         case .respiratoryRate: return .respiratoryRate
         case .wristTemperature: return .appleSleepingWristTemperature
