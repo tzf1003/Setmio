@@ -48,6 +48,16 @@ M5 打磨与收尾
 
 ## 遗留 VERIFY 清单
 
-（构建修复后由 CI 无法覆盖、需要真机或运行时确认的项；随 goal 推进逐条清掉）
+截至 CI 全绿（Xcode 26.6：iOS + watchOS 构建、iOS 26.5 模拟器测试通过）时，编译期能确认的标注已清掉。以下需要真机或运行时确认，代码里仍带 `// VERIFY`：
 
-见下方「CI 之后」一节，由构建收尾时更新。
+| # | 位置 | 要确认的事 | 归属里程碑 |
+|---|---|---|---|
+| 1 | `Packages/SetmioData/.../TrainingEntities.swift`（`#Unique` mesocycleID+day） | mesocycleID 为 nil 时的唯一约束语义（期望：每天一条自由计划） | M3 |
+| 2 | `TrainingEntities.swift` / `HealthEntities.swift` / `LifestyleEntities.swift`（可空 `@Attribute(.unique)`） | 多行 nil 不冲突（hkWorkoutUUID / hkUUID / hkDoseEventUUID） | M2 |
+| 3 | `Apps/Setmio/AppEnvironment.swift` | `@ModelActor` 的 `SetmioStore` 在 iOS 26 上不跑在主线程（Instruments 看主线程占用） | M2 |
+| 4 | `Packages/SetmioHealth/.../WorkoutWriter.swift` | `relateWorkoutEffortSample` 是否自动保存 effort 样本，还是要先 `store.save` | M4 |
+| 5 | `Apps/SetmioWatch/Services/HapticsController.swift` | 抬腕/息屏时训练会话内 `WKInterfaceDevice.play` 是否仍震动；否则用本地通知兜底 | M4 |
+| 6 | `Packages/SetmioAI/.../ImagePreprocessor.swift` | 上传的 JPEG 不含 `{GPS}` / `{Exif}`（`CGImageSourceCopyPropertiesAtIndex` 检查） | 阶段 2 |
+| 7 | `Packages/SetmioHealth/.../MedicationReader.swift`（5 处） | iOS 26 用药 API：按药品授权、`HKUserAnnotatedMedicationQueryDescriptor`、dose event 查询与状态值；当前为返回空的桩 | 阶段 2 |
+
+其他需真机验证、但不对应具体代码标注的：后台投递在锁屏下能打开数据库（文件保护 `.completeUntilFirstUserAuthentication`）、镜像会话能后台拉起 iOS App、Live Activity 暂停态显示、手机不可达时 WatchConnectivity 兜底不重复。
