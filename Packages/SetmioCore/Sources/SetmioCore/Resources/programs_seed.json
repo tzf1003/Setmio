@@ -1,0 +1,86 @@
+[
+  {
+    "id": "10000000-0000-4000-8000-000000000001",
+    "nameZH": "推拉腿（每周 3 天）",
+    "daysPerWeek": 3,
+    "mesocycleWeeks": 5,
+    "days": [
+      {
+        "nameZH": "推",
+        "prescriptions": [
+          { "exerciseID": "00000000-0000-4000-8000-000000000003", "sets": 4, "repRange": [6, 10], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000004", "sets": 3, "repRange": [6, 10], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000008", "sets": 3, "repRange": [8, 12], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000014", "sets": 3, "repRange": [12, 15], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000016", "sets": 3, "repRange": [10, 15], "progression": { "doubleProgression": {} } }
+        ]
+      },
+      {
+        "nameZH": "拉",
+        "prescriptions": [
+          { "exerciseID": "00000000-0000-4000-8000-000000000002", "sets": 3, "repRange": [4, 6], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000006", "sets": 3, "repRange": [6, 10], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000005", "sets": 3, "repRange": [8, 12], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000021", "sets": 3, "repRange": [12, 15], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000015", "sets": 3, "repRange": [10, 15], "progression": { "doubleProgression": {} } }
+        ]
+      },
+      {
+        "nameZH": "腿",
+        "prescriptions": [
+          { "exerciseID": "00000000-0000-4000-8000-000000000001", "sets": 4, "repRange": [5, 8], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000009", "sets": 3, "repRange": [8, 12], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000010", "sets": 3, "repRange": [10, 15], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000018", "sets": 3, "repRange": [10, 15], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000019", "sets": 3, "repRange": [10, 15], "progression": { "doubleProgression": {} } }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "10000000-0000-4000-8000-000000000002",
+    "nameZH": "上下肢分化（每周 4 天）",
+    "daysPerWeek": 4,
+    "mesocycleWeeks": 5,
+    "days": [
+      {
+        "nameZH": "上肢 A",
+        "prescriptions": [
+          { "exerciseID": "00000000-0000-4000-8000-000000000003", "sets": 4, "repRange": [5, 8], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000005", "sets": 4, "repRange": [6, 10], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000004", "sets": 3, "repRange": [8, 12], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000015", "sets": 3, "repRange": [10, 15], "progression": { "doubleProgression": {} } }
+        ]
+      },
+      {
+        "nameZH": "下肢 A",
+        "prescriptions": [
+          { "exerciseID": "00000000-0000-4000-8000-000000000001", "sets": 4, "repRange": [5, 8], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000009", "sets": 3, "repRange": [8, 12], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000017", "sets": 3, "repRange": [12, 15], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000019", "sets": 3, "repRange": [10, 15], "progression": { "doubleProgression": {} } }
+        ]
+      },
+      {
+        "nameZH": "上肢 B",
+        "prescriptions": [
+          { "exerciseID": "00000000-0000-4000-8000-000000000006", "sets": 4, "repRange": [6, 10], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000008", "sets": 3, "repRange": [8, 12], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000012", "sets": 3, "repRange": [10, 12], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000014", "sets": 3, "repRange": [12, 15], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000016", "sets": 3, "repRange": [10, 15], "progression": { "doubleProgression": {} } }
+        ]
+      },
+      {
+        "nameZH": "下肢 B",
+        "prescriptions": [
+          { "exerciseID": "00000000-0000-4000-8000-000000000002", "sets": 3, "repRange": [4, 6], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000010", "sets": 3, "repRange": [10, 15], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000011", "sets": 3, "repRange": [8, 12], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000018", "sets": 3, "repRange": [10, 15], "progression": { "doubleProgression": {} } },
+          { "exerciseID": "00000000-0000-4000-8000-000000000024", "sets": 3, "repRange": [10, 15], "progression": { "doubleProgression": {} } }
+        ]
+      }
+    ]
+  }
+]

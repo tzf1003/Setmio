@@ -1,0 +1,30 @@
+{
+  "cases": [
+    {
+      "name": "flat baseline, average day",
+      "historyDays": 30,
+      "baseline": { "hrv": 50, "rhr": 55, "sleepMinutes": 450 },
+      "today": { "hrv": 50, "rhr": 55, "sleepMinutes": 450 },
+      "expectedScore": 65,
+      "tolerance": 2,
+      "expectedBand": "green"
+    },
+    {
+      "name": "illness override: HRV far below and RHR far above baseline",
+      "historyDays": 30,
+      "baseline": { "hrv": 50, "rhr": 55, "sleepMinutes": 450 },
+      "today": { "hrv": 30, "rhr": 65, "sleepMinutes": 450 },
+      "expectedScore": 35,
+      "tolerance": 1,
+      "expectedBand": "red",
+      "expectedFlag": "recoveryDayOverride"
+    },
+    {
+      "name": "short baseline is insufficient",
+      "historyDays": 10,
+      "baseline": { "hrv": 50, "rhr": 55, "sleepMinutes": 450 },
+      "today": { "hrv": 50, "rhr": 55, "sleepMinutes": 450 },
+      "insufficient": true
+    }
+  ]
+}
