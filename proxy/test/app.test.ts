@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { sha256Hex } from "../src/auth.js";
 import { createApp, type Deps } from "../src/index.js";
 import type { LogEntry } from "../src/logging.js";
 import { DEFAULT_LIMITS } from "../src/ratelimit.js";
@@ -170,8 +171,9 @@ describe("proxy app", () => {
     expect(limited.headers.get("retry-after")).toBe(String(16 * 3600));
     expect(h.backend.calls).toHaveLength(3);
 
-    // Counter key shape and reset on the next day.
-    expect(await h.store.get(`rl:${(await h.store.get(`rl:x`)) ?? ""}`)).toBeNull();
+    // Counter key shape (`rl:<deviceId>:<route>:<yyyy-mm-dd>`) and reset on the next day.
+    const record = JSON.parse((await h.store.get(`devices:${await sha256Hex(deviceToken)}`)) ?? "{}") as { deviceId: string };
+    expect(await h.store.get(`rl:${record.deviceId}:food/recognize:2026-10-09`)).toBe("4");
     h.clock.now = new Date("2026-10-10T00:00:01Z");
     const nextDay = await post(h.app, "/v1/food/recognize", recognizeBody, auth);
     expect(nextDay.status).toBe(200);
