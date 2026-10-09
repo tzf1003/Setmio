@@ -53,6 +53,7 @@ npm install && npm run dev                   # 本地 Node 运行；wrangler dev
 | 检查 | 结果 |
 |---|---|
 | Linux 包测试（Core / AI / Health / Data / UI） | 91 个测试通过 |
+| macOS 包测试（SwiftData 存储层 + 格式化） | 17 + 7 个测试通过 |
 | proxy（typecheck + vitest） | 18 个测试通过 |
 | Xcode 26.6：iOS 构建（含 watch App 与 Widget）、watchOS 构建 | BUILD SUCCEEDED |
 | iOS 26.5 模拟器宿主测试 | TEST SUCCEEDED |
