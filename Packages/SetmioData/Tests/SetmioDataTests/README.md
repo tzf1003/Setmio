@@ -1,0 +1,1 @@
+`ModelContainerTests.swift` needs SwiftData and therefore Xcode on a Mac (`swift test --package-path Packages/SetmioData` on macOS, or `make test-ios`); on Linux only the Foundation-only `JSONBlobTests.swift` runs.

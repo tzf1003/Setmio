@@ -1,0 +1,4 @@
+# 复制为 .dev.vars（已被 git 忽略）。Node 模式下同名环境变量同样生效。
+ANTHROPIC_API_KEY=
+INVITE_CODE=
+ALLOW_BACKEND_OVERRIDE=false

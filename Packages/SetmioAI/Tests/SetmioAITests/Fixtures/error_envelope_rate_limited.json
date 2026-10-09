@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "rate_limited",
+    "message": "今日 food/recognize 额度已用完（60/天）",
+    "retryable": true,
+    "retryAfterSeconds": 3600
+  }
+}

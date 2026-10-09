@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "nameZH": "番茄炒蛋",
+      "nameEN": "Scrambled eggs with tomato",
+      "portion": { "amount": 1, "unit": "份", "gramsEstimate": 220 },
+      "kcal": { "low": 200, "best": 260, "high": 340 },
+      "macrosBest": { "proteinG": 13, "carbsG": 9, "fatG": 19 },
+      "confidence": 0.72,
+      "needsConfirmation": true
+    },
+    {
+      "nameZH": "米饭",
+      "nameEN": "Steamed rice",
+      "portion": { "amount": 1, "unit": "碗", "gramsEstimate": 200 },
+      "kcal": { "low": 210, "best": 232, "high": 260 },
+      "macrosBest": { "proteinG": 5, "carbsG": 52, "fatG": 0.6 },
+      "confidence": 0.85,
+      "needsConfirmation": false
+    },
+    {
+      "nameZH": "紫菜蛋花汤",
+      "nameEN": "Seaweed and egg drop soup",
+      "portion": { "amount": 1, "unit": "碗", "gramsEstimate": 250 },
+      "kcal": { "low": 30, "best": 45, "high": 70 },
+      "macrosBest": { "proteinG": 3, "carbsG": 2, "fatG": 2.5 },
+      "confidence": 0.6,
+      "needsConfirmation": true
+    }
+  ],
+  "overallConfidence": 0.74,
+  "notesZH": "番茄炒蛋用油量不确定（家常约 15–25 g），已按中等用油估算；米饭按标准碗约 200 g。请确认份量后保存。",
+  "model": { "provider": "claude", "id": "claude-opus-5-5" }
+}

@@ -1,0 +1,158 @@
+# XcodeGen spec. `make generate` → Setmio.xcodeproj (git-ignored). Info.plist / .entitlements are generated here too.
+name: Setmio
+
+options:
+  bundleIdPrefix: com.setmio
+  deploymentTarget:
+    iOS: "26.0"
+    watchOS: "26.0"
+  xcodeVersion: "26.0"
+  developmentLanguage: zh-Hans
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+configFiles:
+  Debug: Config/Shared.xcconfig
+  Release: Config/Shared.xcconfig
+
+packages:
+  SetmioCore:
+    path: Packages/SetmioCore
+  SetmioData:
+    path: Packages/SetmioData
+  SetmioHealth:
+    path: Packages/SetmioHealth
+  SetmioAI:
+    path: Packages/SetmioAI
+  SetmioUI:
+    path: Packages/SetmioUI
+
+targets:
+  Setmio:
+    type: application
+    platform: iOS
+    sources:
+      - Apps/Setmio
+    dependencies:
+      - package: SetmioCore
+      - package: SetmioData
+      - package: SetmioHealth
+        products: [SetmioHealth, SetmioHealthTesting]
+      - package: SetmioAI
+      - package: SetmioUI
+      - target: SetmioWatch
+      - target: SetmioWidgets
+    info:
+      path: Apps/Setmio/Info.plist
+      properties:
+        CFBundleDisplayName: Setmio
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: false
+        NSHealthShareUsageDescription: "Setmio 读取您的心率、心率变异性、睡眠、呼吸频率、体温、体重与训练记录，用于计算每日准备度并规划训练。所有数据仅保存在本机。"
+        NSHealthUpdateUsageDescription: "Setmio 会将力量训练记录与训练强度评分写入“健康”App。"
+        NSCameraUsageDescription: "拍摄食物照片以估算热量（可选功能）。"
+        NSPhotoLibraryUsageDescription: "从相册选择食物照片以估算热量（可选功能）。"
+        NSMotionUsageDescription: "用于在训练中估算动作次数（可选功能）。"
+    entitlements:
+      path: Apps/Setmio/Setmio.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.background-delivery: true
+        com.apple.developer.healthkit.access: []
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.setmio.app
+        TARGETED_DEVICE_FAMILY: "1"
+
+  SetmioWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - Apps/SetmioWatch
+    dependencies:
+      - package: SetmioCore
+      - package: SetmioHealth
+        products: [SetmioHealth, SetmioHealthTesting]
+      - package: SetmioUI
+    info:
+      path: Apps/SetmioWatch/Info.plist
+      properties:
+        CFBundleDisplayName: Setmio
+        WKApplication: true
+        WKRunsIndependentlyOfCompanionApp: true
+        WKCompanionAppBundleIdentifier: com.setmio.app
+        WKBackgroundModes:
+          - workout-processing
+        NSHealthShareUsageDescription: "Setmio 读取您的心率与训练记录，用于在手表上记录力量训练并显示实时心率。"
+        NSHealthUpdateUsageDescription: "Setmio 会将手表上记录的力量训练与训练强度评分写入“健康”App。"
+        NSMotionUsageDescription: "用于在训练中估算动作次数（可选功能）。"
+    entitlements:
+      path: Apps/SetmioWatch/SetmioWatch.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.setmio.app.watchkitapp
+
+  SetmioWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Apps/SetmioWidgets
+    dependencies:
+      - package: SetmioCore
+      - package: SetmioUI
+    info:
+      path: Apps/SetmioWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Setmio
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.setmio.app.widgets
+
+  SetmioTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests/SetmioTests
+    dependencies:
+      - target: Setmio
+      - package: SetmioCore
+      - package: SetmioData
+      - package: SetmioHealth
+        products: [SetmioHealth, SetmioHealthTesting]
+
+  SetmioWatchTests:
+    type: bundle.unit-test
+    platform: watchOS
+    sources:
+      - Tests/SetmioWatchTests
+    dependencies:
+      - target: SetmioWatch
+      - package: SetmioCore
+
+schemes:
+  Setmio:
+    build:
+      targets:
+        Setmio: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - SetmioTests
+  SetmioWatch:
+    build:
+      targets:
+        SetmioWatch: all
+    test:
+      config: Debug
+      targets:
+        - SetmioWatchTests
