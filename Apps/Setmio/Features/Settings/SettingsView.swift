@@ -219,13 +219,10 @@ struct SettingsView: View {
     }
 
     private func requestAuthorization() async {
-        do {
-            try await env.healthSource.requestAuthorization(read: HealthTypes.mvpReadKinds, share: HealthTypes.mvpShareKinds)
-            await refreshAuthorization()
-            await env.syncNow()
-        } catch {
-            authorizationNote = "授权请求失败：\(error.localizedDescription)"
+        if let message = await env.requestHealthAuthorization() {
+            authorizationNote = message
         }
+        await refreshAuthorization()
     }
 
     private func register() async {

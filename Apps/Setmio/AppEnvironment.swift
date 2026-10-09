@@ -211,6 +211,22 @@ final class AppEnvironment {
         if demoChanged { await useDemoData(new.demoDataEnabled) }
     }
 
+    /// Shows the HealthKit sheet for the MVP read/share types, then (re)registers background delivery and syncs.
+    /// Safe to call again after the user changed their mind in the Health app: the sheet only appears for types
+    /// that are still undetermined, and observers/background delivery are idempotent. Returns an error message.
+    func requestHealthAuthorization() async -> String? {
+        do {
+            try await healthSource.requestAuthorization(read: HealthTypes.mvpReadKinds, share: HealthTypes.mvpShareKinds)
+        } catch {
+            return "授权请求失败：\(error.localizedDescription)"
+        }
+        if !settings.demoDataEnabled {
+            _ = await coordinator.start(kinds: HealthMetricKind.mvp)
+        }
+        await syncNow()
+        return nil
+    }
+
     /// Finishes first-launch onboarding: stores the profile and starts a mesocycle from `program`.
     /// Returns an error message (profile is kept only when both steps succeed), nil on success.
     func completeOnboarding(profile new: UserProfile, program: ProgramTemplate) async -> String? {

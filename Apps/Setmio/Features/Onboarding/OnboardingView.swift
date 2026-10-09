@@ -1,5 +1,6 @@
 import SwiftUI
 import SetmioCore
+import SetmioHealth
 import SetmioUI
 
 /// First-launch flow: profile (sex / height / birthday / goal weight) → program template → start the mesocycle.
@@ -7,7 +8,7 @@ import SetmioUI
 struct OnboardingView: View {
     @Environment(AppEnvironment.self) private var env
 
-    private enum Step { case profile, program }
+    private enum Step { case profile, health, program }
 
     @State private var step: Step = .profile
     @State private var sex: BiologicalSex = .male
@@ -18,6 +19,7 @@ struct OnboardingView: View {
     @State private var programs: [ProgramTemplate] = []
     @State private var selectedProgramID: SetmioCore.ID<ProgramTemplate>?
     @State private var isWorking = false
+    @State private var healthNote: String?
     @State private var error: String?
 
     var body: some View {
@@ -25,10 +27,11 @@ struct OnboardingView: View {
             Group {
                 switch step {
                 case .profile: profileForm
+                case .health: healthForm
                 case .program: programForm
                 }
             }
-            .navigationTitle(step == .profile ? "欢迎使用 Setmio" : "选择训练模板")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .task { await loadPrograms() }
         }
@@ -59,13 +62,59 @@ struct OnboardingView: View {
                 Text("这些信息只保存在本机，用于估算能量消耗和个性化基线，不会上传。")
             }
             Section {
-                Button("下一步") { step = .program }
+                Button("下一步") { step = .health }
                     .buttonStyle(.setmioPrimary)
             }
         }
     }
 
-    // MARK: Step 2 — program
+    private var title: String {
+        switch step {
+        case .profile: "欢迎使用 Setmio"
+        case .health: "连接「健康」"
+        case .program: "选择训练模板"
+        }
+    }
+
+    // MARK: Step 2 — HealthKit
+
+    private var healthForm: some View {
+        Form {
+            Section {
+                LabeledContent("读取", value: kindNames(HealthTypes.mvpReadKinds))
+                LabeledContent("写入", value: kindNames(HealthTypes.mvpShareKinds))
+            } header: {
+                Text("Setmio 会访问")
+            } footer: {
+                Text("读取用于计算每日准备度；写入只包含你在 Setmio 里完成的力量训练和强度评分。数据只留在本机。以后可在「健康」App → 共享 → App 中修改。")
+            }
+            if let healthNote {
+                Section { Text(healthNote).font(SetmioTokens.Typography.footnote).foregroundStyle(.secondary) }
+            }
+            Section {
+                Button {
+                    Task {
+                        isWorking = true
+                        healthNote = await env.requestHealthAuthorization()
+                        isWorking = false
+                        if healthNote == nil { step = .program }
+                    }
+                } label: {
+                    if isWorking { ProgressView().tint(.white) } else { Text("授权访问「健康」") }
+                }
+                .buttonStyle(.setmioPrimary)
+                .disabled(isWorking)
+                Button("稍后在设置中授权") { step = .program }
+                    .disabled(isWorking)
+            }
+        }
+    }
+
+    private func kindNames(_ kinds: Set<HealthMetricKind>) -> String {
+        kinds.sorted { $0.rawValue < $1.rawValue }.map(\.nameZH).joined(separator: "、")
+    }
+
+    // MARK: Step 3 — program
 
     private var programForm: some View {
         Form {
@@ -104,7 +153,7 @@ struct OnboardingView: View {
                 }
                 .buttonStyle(.setmioPrimary)
                 .disabled(selectedProgramID == nil || isWorking)
-                Button("返回上一步") { step = .profile }
+                Button("返回上一步") { step = .health }
                     .disabled(isWorking)
             }
         }
