@@ -3,7 +3,7 @@
 前置：一台已配对 Apple Watch 的 iPhone（iOS 26+，watchOS 26+）；开发者账号。
 
 0. 把 `Config/Local.xcconfig` 里的 `SETMIO_TEAM_ID` 改成自己的 Team ID，`make generate`，用 Xcode 选 `Setmio` scheme 运行到 iPhone（手表 App 会随之安装；首次需在手表上信任）。
-   记录：HealthKit / Live Activity / App Groups 能力是否由 Xcode 自动签名成功。
+   记录：HealthKit（含后台投递）能力是否由 Xcode 自动签名成功。
 
 ## M2 · HealthKit
 1. 全新安装并启动 → 引导页：填档案 → 「连接健康」页点「授权访问『健康』」。系统授权表**只应列出**：读取（体重、体脂、瘦体重、心率、静息心率、HRV、呼吸率、腕温、步数、活动/基础能量、睡眠、训练、强度）与写入（训练、心率、活动能量、训练强度）。
