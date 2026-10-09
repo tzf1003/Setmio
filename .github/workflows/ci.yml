@@ -22,6 +22,10 @@ jobs:
         run: swift test --package-path Packages/SetmioAI
       - name: SetmioHealth (HealthKit-free parts)
         run: swift test --package-path Packages/SetmioHealth
+      - name: SetmioData (SwiftData-free parts)
+        run: swift test --package-path Packages/SetmioData
+      - name: SetmioUI (SwiftUI-free parts)
+        run: swift test --package-path Packages/SetmioUI
 
   proxy:
     runs-on: ubuntu-latest
@@ -56,17 +60,24 @@ jobs:
           xcodegen generate --spec project.yml
       - name: Build iOS app (with watch app and widgets)
         run: |
-          set -o pipefail
           xcodebuild -project Setmio.xcodeproj -scheme Setmio \
             -destination 'generic/platform=iOS Simulator' \
-            -configuration Debug CODE_SIGNING_ALLOWED=NO build | tee build-ios.log | grep -E "error:|warning: .*Sendable|BUILD (SUCCEEDED|FAILED)" || true
+            -configuration Debug CODE_SIGNING_ALLOWED=NO \
+            -IDEBuildingContinueBuildingAfterErrors=YES build > build-ios.log 2>&1 || true
+          echo "===== unique errors (iOS) ====="
+          grep -E "(error|fatal error):" build-ios.log | sed -E 's#^/Users/runner/work/Setmio/Setmio/##' | sort -u | head -300 || true
+          tail -5 build-ios.log
           grep -q "BUILD SUCCEEDED" build-ios.log
       - name: Build watchOS app
+        if: always()
         run: |
-          set -o pipefail
           xcodebuild -project Setmio.xcodeproj -scheme SetmioWatch \
             -destination 'generic/platform=watchOS Simulator' \
-            -configuration Debug CODE_SIGNING_ALLOWED=NO build | tee build-watch.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+            -configuration Debug CODE_SIGNING_ALLOWED=NO \
+            -IDEBuildingContinueBuildingAfterErrors=YES build > build-watch.log 2>&1 || true
+          echo "===== unique errors (watchOS) ====="
+          grep -E "(error|fatal error):" build-watch.log | sed -E 's#^/Users/runner/work/Setmio/Setmio/##' | sort -u | head -300 || true
+          tail -5 build-watch.log
           grep -q "BUILD SUCCEEDED" build-watch.log
       - name: Host-app tests (iOS Simulator)
         run: |

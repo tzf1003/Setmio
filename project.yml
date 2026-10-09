@@ -2,7 +2,7 @@
 name: Setmio
 
 options:
-  bundleIdPrefix: com.setmio
+  bundleIdPrefix: com.tzf1003
   deploymentTarget:
     iOS: "26.0"
     watchOS: "26.0"
@@ -37,7 +37,9 @@ targets:
       - package: SetmioCore
       - package: SetmioData
       - package: SetmioHealth
-        products: [SetmioHealth, SetmioHealthTesting]
+        product: SetmioHealth
+      - package: SetmioHealth
+        product: SetmioHealthTesting
       - package: SetmioAI
       - package: SetmioUI
       - target: SetmioWatch
@@ -65,7 +67,7 @@ targets:
         com.apple.developer.healthkit.access: []
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.setmio.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.tzf1003.setmio
         TARGETED_DEVICE_FAMILY: "1"
 
   SetmioWatch:
@@ -76,7 +78,9 @@ targets:
     dependencies:
       - package: SetmioCore
       - package: SetmioHealth
-        products: [SetmioHealth, SetmioHealthTesting]
+        product: SetmioHealth
+      - package: SetmioHealth
+        product: SetmioHealthTesting
       - package: SetmioUI
     info:
       path: Apps/SetmioWatch/Info.plist
@@ -84,7 +88,7 @@ targets:
         CFBundleDisplayName: Setmio
         WKApplication: true
         WKRunsIndependentlyOfCompanionApp: true
-        WKCompanionAppBundleIdentifier: com.setmio.app
+        WKCompanionAppBundleIdentifier: com.tzf1003.setmio
         WKBackgroundModes:
           - workout-processing
         NSHealthShareUsageDescription: "Setmio 读取您的心率与训练记录，用于在手表上记录力量训练并显示实时心率。"
@@ -96,7 +100,7 @@ targets:
         com.apple.developer.healthkit: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.setmio.app.watchkitapp
+        PRODUCT_BUNDLE_IDENTIFIER: com.tzf1003.setmio.watchkitapp
 
   SetmioWidgets:
     type: app-extension
@@ -114,7 +118,7 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.setmio.app.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.tzf1003.setmio.widgets
 
   SetmioTests:
     type: bundle.unit-test
@@ -126,7 +130,11 @@ targets:
       - package: SetmioCore
       - package: SetmioData
       - package: SetmioHealth
-        products: [SetmioHealth, SetmioHealthTesting]
+        product: SetmioHealth
+      - package: SetmioHealth
+        product: SetmioHealthTesting
+      - package: SetmioAI
+      - package: SetmioUI
 
   SetmioWatchTests:
     type: bundle.unit-test
@@ -136,6 +144,11 @@ targets:
     dependencies:
       - target: SetmioWatch
       - package: SetmioCore
+      - package: SetmioHealth
+        product: SetmioHealth
+      - package: SetmioHealth
+        product: SetmioHealthTesting
+      - package: SetmioUI
 
 schemes:
   Setmio:

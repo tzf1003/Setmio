@@ -2,13 +2,14 @@ XCODEGEN ?= xcodegen
 PROJECT   = Setmio.xcodeproj
 SIM_DEST ?= platform=iOS Simulator,name=iPhone 17
 
-.PHONY: help bootstrap generate test-core test-ai test-packages build-ios build-watch test-ios proxy-install proxy-dev proxy-test clean
+.PHONY: help bootstrap generate test-core test-ai test-data test-health test-ui test-packages build-ios build-watch test-ios proxy-install proxy-dev proxy-test clean
 
 help:
 	@echo "make bootstrap      - install xcodegen (brew), create Local.xcconfig, generate project, npm install proxy"
 	@echo "make generate       - regenerate $(PROJECT) from project.yml"
 	@echo "make test-core      - swift test for Packages/SetmioCore (works on Linux + macOS)"
 	@echo "make test-ai        - swift test for Packages/SetmioAI  (works on Linux + macOS)"
+	@echo "make test-packages  - swift test for all five packages (HealthKit/SwiftData parts only run on macOS)"
 	@echo "make build-ios      - xcodebuild the iOS app (macOS only)"
 	@echo "make build-watch    - xcodebuild the watchOS app (macOS only)"
 	@echo "make test-ios       - run SetmioTests on the simulator (macOS only)"
@@ -26,7 +27,16 @@ test-core:
 test-ai:
 	swift test --package-path Packages/SetmioAI
 
-test-packages: test-core test-ai
+test-data:
+	swift test --package-path Packages/SetmioData
+
+test-health:
+	swift test --package-path Packages/SetmioHealth
+
+test-ui:
+	swift test --package-path Packages/SetmioUI
+
+test-packages: test-core test-ai test-data test-health test-ui
 
 build-ios: generate
 	xcodebuild -project $(PROJECT) -scheme Setmio -destination 'generic/platform=iOS' -configuration Debug build CODE_SIGNING_ALLOWED=NO
