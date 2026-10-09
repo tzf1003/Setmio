@@ -1,0 +1,19 @@
+name: Setmio
+options:
+  bundleIdPrefix: com.tzf1003
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  SetmioCore:
+    path: Packages/SetmioCore
+targets:
+  Setmio:
+    type: application
+    platform: iOS
+    sources: [App]
+    dependencies:
+      - package: SetmioCore
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      INFOPLIST_KEY_UILaunchScreen_Generation: YES
+      PRODUCT_BUNDLE_IDENTIFIER: com.tzf1003.setmio

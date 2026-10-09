@@ -1,0 +1,16 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  core-tests:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --package-path Packages/SetmioCore
+  build-app:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen && xcodegen generate
+      - run: xcodebuild -project Setmio.xcodeproj -scheme Setmio -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
