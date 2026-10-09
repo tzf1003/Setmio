@@ -36,7 +36,7 @@ public actor WatchSessionJournal {
 
     public static let defaultFileName = "session-journal.jsonl"
 
-    public let fileURL: URL
+    nonisolated public let fileURL: URL   // immutable and Sendable, so safe to read from outside the actor
     private let fileManager: FileManager
 
     /// `directory` defaults to the app's Documents directory.
