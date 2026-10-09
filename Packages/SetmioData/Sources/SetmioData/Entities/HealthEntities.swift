@@ -64,7 +64,7 @@ extension SetmioSchemaV1 {
         #Index<BodyMeasurementEntity>([\.date])
 
         @Attribute(.unique) public var id: UUID
-        /// Unique when present (HealthKit sample UUID); manual entries have none. // VERIFY: nullable unique attribute allows multiple nil rows
+        /// Unique when present (HealthKit sample UUID); manual entries have none. Multiple nil rows are allowed (ModelContainerTests.nilUniqueValuesDoNotCollide).
         @Attribute(.unique) public var hkUUID: UUID? = nil
         public var date: Date = Date(timeIntervalSince1970: 0)
         public var weight: Double? = nil

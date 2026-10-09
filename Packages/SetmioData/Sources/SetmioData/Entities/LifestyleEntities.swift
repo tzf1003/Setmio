@@ -111,7 +111,7 @@ extension SetmioSchemaV1 {
         public var siteRaw: String? = nil
         public var penID: UUID? = nil
         public var wasMissedMakeup: Bool = false
-        /// Unique when present (iOS 26 HealthKit dose event). // VERIFY: nullable unique attribute allows multiple nil rows
+        /// Unique when present (iOS 26 HealthKit dose event). Multiple nil rows are allowed (ModelContainerTests.nilUniqueValuesDoNotCollide).
         @Attribute(.unique) public var hkDoseEventUUID: UUID? = nil
         public var note: String? = nil
 

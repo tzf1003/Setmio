@@ -316,6 +316,55 @@ struct ModelContainerTests {
         #expect(try await store.glp1Plan(medicationID: medication.id) == nil)
     }
 
+    // MARK: Nullable unique attributes
+
+    @Test("可空的 @Attribute(.unique)：多行 nil 互不冲突，非 nil 仍去重（体重 / 训练 / 剂量）")
+    func nilUniqueValuesDoNotCollide() async throws {
+        let store = try makeStore()
+        let when = Self.day.date(atHour: 7, calendar: Self.calendar)
+
+        // Manual body measurements have no hkUUID.
+        let manual = (0..<3).map { BodyMeasurement(date: when.addingTimeInterval(Double($0) * 60), weight: 80 + Double($0), source: "manual") }
+        #expect(try await store.upsertBodyMeasurements(manual) == 3)
+        #expect(try await store.bodyMeasurements(from: when.addingTimeInterval(-60), to: when.addingTimeInterval(600)).count == 3)
+
+        // Several local sessions without an HKWorkout yet.
+        for index in 0..<3 {
+            let start = when.addingTimeInterval(Double(index) * 7200)
+            try await store.upsertLoggedSession(LoggedSession(start: start, end: start.addingTimeInterval(3600), origin: .phone))
+        }
+        let sessions = try await store.loggedSessions(in: when.addingTimeInterval(-60)...when.addingTimeInterval(86_400))
+        #expect(sessions.count == 3)
+        #expect(sessions.allSatisfy { $0.hkWorkoutUUID == nil })
+
+        // Two doses without a HealthKit dose event.
+        let medication = Medication(drug: .tirzepatide, form: .penMultiDose(inUseDays: 30), startedOn: Self.day.adding(days: -40, calendar: Self.calendar))
+        try await store.upsertMedication(medication)
+        for week in 0..<2 {
+            try await store.upsertDoseLog(DoseLog(medicationID: medication.id, takenAt: when.addingTimeInterval(Double(week) * 7 * 86_400), doseMg: 5))
+        }
+        #expect(try await store.doseLogs(medicationID: medication.id).count == 2)
+    }
+
+    @Test("PlannedSession 的 (mesocycleID, day) 唯一：自由训练(nil)每天一条，且与周期计划共存")
+    func plannedSessionUniquenessWithNilMesocycle() async throws {
+        let store = try makeStore()
+        let meso = Mesocycle(templateID: ID(), startDay: Self.day, weeks: MesocycleWeek.defaultBlock(workingWeeks: 3))
+        try await store.upsertMesocycle(meso)
+
+        // Same day, free session written twice with different ids → one row (the later one wins).
+        try await store.upsertPlannedSession(PlannedSession(mesocycleID: nil, day: Self.day, dayNameZH: "自由 A", exercises: []))
+        try await store.upsertPlannedSession(PlannedSession(mesocycleID: nil, day: Self.day, dayNameZH: "自由 B", exercises: []))
+        // Another day is independent; a mesocycle plan for the same day coexists with the free one.
+        try await store.upsertPlannedSession(PlannedSession(mesocycleID: nil, day: Self.day.adding(days: 1, calendar: Self.calendar), dayNameZH: "自由 C", exercises: []))
+        try await store.upsertPlannedSession(PlannedSession(mesocycleID: meso.id, day: Self.day, dayNameZH: "周期", exercises: []))
+
+        let all = try await store.plannedSessions(from: Self.day, to: Self.day.adding(days: 1, calendar: Self.calendar))
+        #expect(all.count == 3)
+        #expect(all.filter { $0.mesocycleID == nil && $0.day == Self.day }.map(\.dayNameZH) == ["自由 B"])
+        #expect(try await store.plannedSession(for: Self.day, mesocycleID: meso.id)?.dayNameZH == "周期")
+    }
+
     @Test("档案与设置为单例行")
     func profileAndSettingsSingletons() async throws {
         let store = try makeStore()

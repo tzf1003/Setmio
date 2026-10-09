@@ -48,16 +48,16 @@ M5 打磨与收尾
 
 ## 遗留 VERIFY 清单
 
-截至 CI 全绿（Xcode 26.6：iOS + watchOS 构建、iOS 26.5 模拟器测试、macOS 上 SwiftData 存储层 17 个测试通过）时，编译期能确认的标注已清掉。以下需要真机或运行时确认，代码里仍带 `// VERIFY`：
+阶段 1 收尾时的处理结果（`// VERIFY` 标注只保留真正无法在 Mac 上确认的）：
 
-| # | 位置 | 要确认的事 | 归属里程碑 |
-|---|---|---|---|
-| 1 | `Packages/SetmioData/.../TrainingEntities.swift`（`#Unique` mesocycleID+day） | mesocycleID 为 nil 时的唯一约束语义（期望：每天一条自由计划） | M3 |
-| 2 | `TrainingEntities.swift` / `HealthEntities.swift` / `LifestyleEntities.swift`（可空 `@Attribute(.unique)`） | 多行 nil 不冲突（hkWorkoutUUID / hkUUID / hkDoseEventUUID） | M2 |
-| 3 | `Apps/Setmio/AppEnvironment.swift` | `@ModelActor` 的 `SetmioStore` 在 iOS 26 上不跑在主线程（Instruments 看主线程占用） | M2 |
-| 4 | `Packages/SetmioHealth/.../WorkoutWriter.swift` | `relateWorkoutEffortSample` 是否自动保存 effort 样本，还是要先 `store.save` | M4 |
-| 5 | `Apps/SetmioWatch/Services/HapticsController.swift` | 抬腕/息屏时训练会话内 `WKInterfaceDevice.play` 是否仍震动；否则用本地通知兜底 | M4 |
-| 6 | `Packages/SetmioAI/.../ImagePreprocessor.swift` | 上传的 JPEG 不含 `{GPS}` / `{Exif}`（`CGImageSourceCopyPropertiesAtIndex` 检查） | 阶段 2 |
-| 7 | `Packages/SetmioHealth/.../MedicationReader.swift`（5 处） | iOS 26 用药 API：按药品授权、`HKUserAnnotatedMedicationQueryDescriptor`、dose event 查询与状态值；当前为返回空的桩 | 阶段 2 |
+| # | 位置 | 结论 |
+|---|---|---|
+| 1 | `TrainingEntities.swift`（`#Unique` mesocycleID+day） | **已确认并移除标注**：nil 的 mesocycleID 在 SQLite 里互不冲突，“每天一条自由计划”由 `SetmioStore.upsertPlannedSession` 保证；`ModelContainerTests.plannedSessionUniquenessWithNilMesocycle` |
+| 2 | 三处可空 `@Attribute(.unique)` | **已确认并移除标注**：多行 nil 不冲突、非 nil 仍去重；`ModelContainerTests.nilUniqueValuesDoNotCollide` |
+| 3 | `AppEnvironment.swift`（`@ModelActor` 线程） | **已确认并处理**：`SetmioStore` 的任务在**调用方是主 actor 时跑在主线程**（与创建线程无关），后台调用方则不在主线程。`HealthSyncService` 的 60 天聚合/评分改在 `Task.detached` 内执行；`StoreExecutorTests` 记录该行为 |
+| 4 | `WorkoutWriter.swift`（effort 样本） | **改为稳妥写法并移除标注**：先 `store.save(sample)` 再 `relateWorkoutEffortSample`（若后者自带保存则幂等）。真机验证见 M4 清单“健身 App 里 effort 为 7” |
+| 5 | `HapticsController.swift`（抬腕/息屏震动） | **保留**：只能在手表上观察。无论结果如何，本地通知兜底都会在休息结束时响，不会静默 |
+| 6 | `ImagePreprocessor.swift`（EXIF/GPS） | **保留**：属阶段 2（拍照识别），本阶段不使用 |
+| 7 | `MedicationReader.swift`（用药 API，5 处） | **保留**：属阶段 2（减肥针记录），当前为返回空的桩；本 goal 不扩展减肥针功能 |
 
-其他需真机验证、但不对应具体代码标注的：后台投递在锁屏下能打开数据库（文件保护 `.completeUntilFirstUserAuthentication`）、镜像会话能后台拉起 iOS App、Live Activity 暂停态显示、手机不可达时 WatchConnectivity 兜底不重复。
+其他需真机验证、但不对应具体代码标注的：后台投递在锁屏下能打开数据库（文件保护 `.completeUntilFirstUserAuthentication`）、镜像会话能后台拉起 iOS App、Live Activity 暂停态显示与按钮回传、手机不可达时 WatchConnectivity 兜底不重复。

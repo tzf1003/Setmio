@@ -77,7 +77,9 @@ extension SetmioSchemaV1 {
 
     @Model
     public final class PlannedSessionEntity {
-        #Unique<PlannedSessionEntity>([\.mesocycleID, \.day]) // VERIFY: #Unique semantics when mesocycleID is nil (free sessions): intended "one free plan per day"
+        #Unique<PlannedSessionEntity>([\.mesocycleID, \.day])
+        // nil mesocycleIDs are distinct to SQLite, so "one free plan per day" is enforced by `SetmioStore.upsertPlannedSession`
+        // (ModelContainerTests.plannedSessionUniquenessWithNilMesocycle); the constraint still guards mesocycle plans.
         #Index<PlannedSessionEntity>([\.day])
 
         @Attribute(.unique) public var id: UUID
@@ -110,7 +112,7 @@ extension SetmioSchemaV1 {
         public var feedbackPump: Int? = nil
         public var feedbackJoint: Int? = nil
         public var feedbackNote: String? = nil
-        /// Unique when present; many sessions may have none. // VERIFY: nullable unique attribute allows multiple nil rows
+        /// Unique when present; many sessions may have none. Multiple nil rows are allowed (ModelContainerTests.nilUniqueValuesDoNotCollide).
         @Attribute(.unique) public var hkWorkoutUUID: UUID? = nil
         /// Apple workout effort score 1–10.
         public var effortScore: Int? = nil
