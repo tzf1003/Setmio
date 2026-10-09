@@ -100,6 +100,8 @@ final class HealthSyncService: HealthSampleSink {
     private(set) var lastReport: ImportReport?
     private(set) var lastError: String?
     private(set) var isSyncing = false
+    /// Live progress of the import phase of `syncToday` (nil outside a sync); drives the progress bar.
+    private(set) var importProgress: ImportProgress?
     private(set) var lastSyncedAt: Date?
     private(set) var readiness: ReadinessResult?
     private(set) var todayMetrics: DailyMetrics?
@@ -130,10 +132,18 @@ final class HealthSyncService: HealthSampleSink {
 
         do {
             let settings = try await store.settings()
-            let report = await importer.importAll(kinds: HealthMetricKind.mvp)
+            // The importer works on its own actor; progress hops back here so only a tiny value touches the main actor.
+            let report = await importer.importAll(kinds: HealthMetricKind.mvp) { [weak self] progress in
+                Task { @MainActor in self?.importProgress = progress }
+            }
+            importProgress = nil
             lastReport = report
-            try await rebuildDailyMetrics(settings: settings, now: now)
-            readiness = try await computeReadiness(settings: settings, now: now)
+            let outcome = try await runOffMain { service in
+                let today = try await service.rebuildDailyMetrics(settings: settings, now: now)
+                return (today, try await service.computeReadiness(settings: settings, now: now))
+            }
+            todayMetrics = outcome.0
+            readiness = outcome.1
             ingestSnapshot = await sink.currentSnapshot()
             lastSyncedAt = now
             if report.succeeded {
@@ -144,6 +154,7 @@ final class HealthSyncService: HealthSampleSink {
         } catch {
             lastError = "同步失败：\(String(describing: error))"
         }
+        importProgress = nil
     }
 
     /// Called by `BackgroundDeliveryCoordinator` after an observer-triggered import: no new import, just
@@ -154,8 +165,12 @@ final class HealthSyncService: HealthSampleSink {
         defer { isSyncing = false }
         do {
             let settings = try await store.settings()
-            try await rebuildDailyMetrics(settings: settings, now: now, onlyRecent: true)
-            readiness = try await computeReadiness(settings: settings, now: now)
+            let outcome = try await runOffMain { service in
+                let today = try await service.rebuildDailyMetrics(settings: settings, now: now, onlyRecent: true)
+                return (today, try await service.computeReadiness(settings: settings, now: now))
+            }
+            todayMetrics = outcome.0
+            readiness = outcome.1
             ingestSnapshot = await sink.currentSnapshot()
             lastSyncedAt = now
         } catch {
@@ -171,7 +186,14 @@ final class HealthSyncService: HealthSampleSink {
 
     // MARK: Aggregation
 
-    private func rebuildDailyMetrics(settings: Settings, now: Date, onlyRecent: Bool = false) async throws {
+    /// Runs `work` in a detached task. `SetmioStore` is a `@ModelActor` whose jobs execute on the main thread when
+    /// started from the main actor (StoreExecutorTests), so the 60-day aggregation must not start here.
+    private func runOffMain<T: Sendable>(_ work: @escaping @Sendable (HealthSyncService) async throws -> T) async throws -> T {
+        try await Task.detached(priority: .userInitiated) { [self] in try await work(self) }.value
+    }
+
+    /// Re-aggregates the missing/recent days and returns today's metrics. Touches no main-actor state.
+    nonisolated private func rebuildDailyMetrics(settings: Settings, now: Date, onlyRecent: Bool = false) async throws -> DailyMetrics? {
         let calendar = settings.calendar
         let today = DayKey(now, calendar: calendar)
         let windowStart = today.adding(days: -(Self.historyDays - 1), calendar: calendar)
@@ -201,11 +223,11 @@ final class HealthSyncService: HealthSampleSink {
             try await store.upsertDailyMetrics(metrics)
             byDay[day] = metrics
         }
-        todayMetrics = byDay[today]
+        return byDay[today]
     }
 
     /// Mean wrist temperature of the previous 14 nights that have one (Apple uses a similar personal baseline).
-    private static func baselineWristTemperature(before day: DayKey, in byDay: [DayKey: DailyMetrics], calendar: Calendar) -> Double? {
+    nonisolated private static func baselineWristTemperature(before day: DayKey, in byDay: [DayKey: DailyMetrics], calendar: Calendar) -> Double? {
         let start = day.adding(days: -14, calendar: calendar)
         let values = byDay.values
             .filter { $0.day >= start && $0.day < day }
@@ -213,7 +235,7 @@ final class HealthSyncService: HealthSampleSink {
         return Stats.mean(values)
     }
 
-    private func computeReadiness(settings: Settings, now: Date) async throws -> ReadinessResult {
+    nonisolated private func computeReadiness(settings: Settings, now: Date) async throws -> ReadinessResult {
         let calendar = settings.calendar
         let today = DayKey(now, calendar: calendar)
         let history = try await store.dailyMetrics(

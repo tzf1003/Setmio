@@ -29,6 +29,29 @@ public struct ImportReport: Sendable, Equatable {
     public var succeeded: Bool { errors.isEmpty }
 }
 
+/// A snapshot of an `importAll` run, reported after every imported page (for progress UI).
+public struct ImportProgress: Sendable, Equatable {
+    /// The kind being imported right now.
+    public var kind: HealthMetricKind
+    /// 0-based position of `kind` in the run, and the number of kinds in the run.
+    public var kindIndex: Int
+    public var kindCount: Int
+    /// Samples ingested so far across the whole run.
+    public var importedSoFar: Int
+
+    public init(kind: HealthMetricKind, kindIndex: Int, kindCount: Int, importedSoFar: Int) {
+        self.kind = kind
+        self.kindIndex = kindIndex
+        self.kindCount = kindCount
+        self.importedSoFar = importedSoFar
+    }
+
+    /// Fraction of kinds finished (the current kind counts as in progress, not done).
+    public var fractionOfKindsCompleted: Double {
+        kindCount > 0 ? Double(kindIndex) / Double(kindCount) : 1
+    }
+}
+
 /// Pulls samples from a `HealthSampleSource` page by page and hands them to the sink.
 ///
 /// - One kind is never imported twice concurrently: a second caller for the same kind awaits the in-flight
@@ -51,11 +74,20 @@ public actor HealthSampleImporter {
     }
 
     /// Imports every kind in order, never throwing: failures are collected per kind in the report.
-    public func importAll(kinds: [HealthMetricKind] = HealthMetricKind.mvp) async -> ImportReport {
+    /// `progress` is called at the start of every kind and after every page (including empty ones).
+    public func importAll(kinds: [HealthMetricKind] = HealthMetricKind.mvp, progress: (@Sendable (ImportProgress) -> Void)? = nil) async -> ImportReport {
         var report = ImportReport(startedAt: Date(), finishedAt: Date())
-        for kind in kinds {
+        for (index, kind) in kinds.enumerated() {
+            let before = report.totalImported
+            progress?(ImportProgress(kind: kind, kindIndex: index, kindCount: kinds.count, importedSoFar: before))
             do {
-                report.counts[kind] = try await importNew(kind)
+                var onPage: (@Sendable (Int) -> Void)?
+                if let progress {
+                    onPage = { @Sendable importedInKind in
+                        progress(ImportProgress(kind: kind, kindIndex: index, kindCount: kinds.count, importedSoFar: before + importedInKind))
+                    }
+                }
+                report.counts[kind] = try await importNew(kind, onPage: onPage)
             } catch {
                 report.errors[kind] = String(describing: error)
             }
@@ -67,11 +99,15 @@ public actor HealthSampleImporter {
     /// Imports pages until one comes back shorter than the page size. Returns the number of samples ingested.
     @discardableResult
     public func importNew(_ kind: HealthMetricKind) async throws -> Int {
+        try await importNew(kind, onPage: nil)
+    }
+
+    private func importNew(_ kind: HealthMetricKind, onPage: (@Sendable (Int) -> Void)?) async throws -> Int {
         if let running = inFlight[kind] {
             return try await running.value
         }
         let task = Task<Int, any Error> { [self] in
-            try await self.runImport(kind)
+            try await self.runImport(kind, onPage: onPage)
         }
         inFlight[kind] = task
         defer { inFlight[kind] = nil }
@@ -87,7 +123,7 @@ public actor HealthSampleImporter {
 
     // MARK: Internals
 
-    private func runImport(_ kind: HealthMetricKind) async throws -> Int {
+    private func runImport(_ kind: HealthMetricKind, onPage: (@Sendable (Int) -> Void)?) async throws -> Int {
         var anchor = await anchors.get(kind)
         var imported = 0
         var pages = 0
@@ -100,6 +136,7 @@ public actor HealthSampleImporter {
             }
             imported += batch.samples.count
             pages += 1
+            onPage?(imported)
 
             let fullPage = batch.samples.count >= pageSize || batch.deletedUUIDs.count >= pageSize
             let anchorAdvanced = batch.newAnchor != nil && batch.newAnchor != anchor

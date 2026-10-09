@@ -27,6 +27,12 @@ import SwiftData
 @ModelActor
 public actor SetmioStore { // @ModelActor generates a public init(modelContainer:) (verified by the Xcode 26.6 CI build)
     /// A HealthKit workout whose start is within this many seconds of a local session's start is treated as the same session.
+    /// Diagnostic: whether the calling job is running on the main thread. Measured on macOS 27 / Swift 6.4: a
+    /// `@ModelActor` method runs on the *caller's* thread when the caller is the main actor (creating the store
+    /// off-main does not change that) and on a background thread otherwise. So heavy store work (a 60-day sync)
+    /// must be started from a non-main context; see `HealthSyncService` and `StoreExecutorTests`.
+    public func isExecutingOnMainThread() -> Bool { pthread_main_np() != 0 }
+
     public static let workoutMatchToleranceSeconds: TimeInterval = 15 * 60
 
     // MARK: - Daily metrics

@@ -74,7 +74,7 @@ struct TodayView: View {
 
             case .none:
                 if sync.isSyncing {
-                    ProgressView("正在同步健康数据…")
+                    syncProgressView
                 } else {
                     Text("尚未同步")
                         .foregroundStyle(.secondary)
@@ -83,6 +83,21 @@ struct TodayView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .setmioCard()
+    }
+
+    /// Determinate while importing (kind-by-kind), indeterminate while aggregating and scoring.
+    @ViewBuilder
+    private var syncProgressView: some View {
+        if let progress = sync.importProgress {
+            VStack(alignment: .leading, spacing: SetmioTokens.Spacing.xs) {
+                ProgressView(value: progress.fractionOfKindsCompleted)
+                Text("正在导入 \(progress.kind.nameZH)（\(progress.kindIndex + 1)/\(progress.kindCount)）· 已导入 \(progress.importedSoFar) 条")
+                    .font(SetmioTokens.Typography.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            ProgressView("正在计算每日指标与评分…")
+        }
     }
 
     private func componentRow(_ component: ReadinessComponent) -> some View {

@@ -102,8 +102,8 @@ final class AppEnvironment {
         }
         self.container = container
         self.startupError = startupError
-        // VERIFY: on iOS 17 a @ModelActor created from the main actor ran on the main thread; confirm on iOS 26
-        // that SetmioStore's executor is a background one (SetmioData notes). If not, create it in a detached task.
+        // A @ModelActor's jobs run on the main thread when the caller is the main actor (measured by
+        // StoreExecutorTests), so heavy store work is started from detached tasks / actors, never from here.
         let store = SetmioStore(modelContainer: container)
         self.store = store
 

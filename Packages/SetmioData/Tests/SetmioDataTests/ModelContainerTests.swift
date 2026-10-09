@@ -337,4 +337,36 @@ struct ModelContainerTests {
         #expect(try await store.settings() == settings)
     }
 }
+
+@Suite("SetmioStore · 执行线程")
+struct StoreExecutorTests {
+    /// Documents the platform behaviour `HealthSyncService` relies on: store calls made from the main actor execute
+    /// on the main thread, while calls made from background work (importer/sink actors, `@concurrent` functions) do not.
+    @Test("后台调用方不会让 store 在主线程执行")
+    func backgroundCallerStaysOffMain() async throws {
+        let container = try ModelContainerFactory.make(inMemory: true)
+        let store = SetmioStore(modelContainer: container)
+        let onMain = await Task.detached { await store.isExecutingOnMainThread() }.value
+        #expect(onMain == false)
+    }
+
+    /// Heavy store work started from the main actor must be wrapped in `Task.detached` (as `HealthSyncService`
+    /// does): measured on macOS 27, a direct call from the main actor — even through an actor or a `@concurrent`
+    /// function — can still execute the store's job on the main thread, a detached task never does.
+    @Test("从主 actor 启动的 Task.detached 里连续调用 store 都不在主线程")
+    @MainActor
+    func detachedLoopStaysOffMain() async throws {
+        let container = try ModelContainerFactory.make(inMemory: true)
+        let store = SetmioStore(modelContainer: container)
+        let results = await Task.detached {
+            var all: [Bool] = []
+            for _ in 0..<5 {
+                all.append(await store.isExecutingOnMainThread())
+                _ = try? await store.settings()
+            }
+            return all
+        }.value
+        #expect(results == Array(repeating: false, count: 5))
+    }
+}
 #endif

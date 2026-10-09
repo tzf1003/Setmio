@@ -34,6 +34,14 @@ enum HealthFixture {
     }
 }
 
+/// Thread-safe collector for `ImportProgress` callbacks.
+final class ProgressLog: @unchecked Sendable { // lock-guarded array; the callback is @Sendable and may run on any executor
+    private let lock = NSLock()
+    private var storage: [ImportProgress] = []
+    func append(_ event: ImportProgress) { lock.lock(); storage.append(event); lock.unlock() }
+    var events: [ImportProgress] { lock.lock(); defer { lock.unlock() }; return storage }
+}
+
 /// Records every ingested batch; optionally fails on chosen calls.
 actor RecordingSink: HealthSampleSink {
     struct Failure: Error, Equatable { let call: Int }
@@ -175,6 +183,26 @@ struct HealthSampleImporterTests {
         #expect(report.failedKinds == [.heartRate])
         #expect(report.totalImported == 12)
         #expect(!report.succeeded)
+    }
+
+    @Test("importAll reports progress per kind and per page, ending at the full count")
+    func importAllProgress() async throws {
+        let source = FakeHealthSampleSource(samples: [
+            .steps: HealthFixture.samples(.steps, count: 1_000),
+            .heartRate: HealthFixture.samples(.heartRate, count: 5),
+        ])
+        let importer = HealthSampleImporter(source: source, anchors: HealthFixture.anchors(), sink: RecordingSink(), pageSize: 400)
+        let log = ProgressLog()
+
+        _ = await importer.importAll(kinds: [.steps, .heartRate]) { log.append($0) }
+
+        let events = log.events
+        #expect(events.first == ImportProgress(kind: .steps, kindIndex: 0, kindCount: 2, importedSoFar: 0))
+        // 1 000 samples at 400 per page → pages of 400, 400, 200.
+        #expect(events.filter { $0.kind == .steps }.map(\.importedSoFar) == [0, 400, 800, 1_000])
+        #expect(events.last == ImportProgress(kind: .heartRate, kindIndex: 1, kindCount: 2, importedSoFar: 1_005))
+        #expect(events.map(\.importedSoFar) == events.map(\.importedSoFar).sorted(), "progress never goes backwards")
+        #expect(events.last?.fractionOfKindsCompleted == 0.5)
     }
 
     @Test("concurrent imports of the same kind share one run")

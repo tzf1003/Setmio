@@ -79,6 +79,12 @@ struct SettingsView: View {
                 Task { await env.syncService.resetAndReimport(); await env.refreshTodayPlan() }
             }
             .disabled(env.syncService.isSyncing)
+            if env.syncService.isSyncing, let progress = env.syncService.importProgress {
+                ProgressView(value: progress.fractionOfKindsCompleted) {
+                    Text("导入 \(progress.kind.nameZH)（\(progress.kindIndex + 1)/\(progress.kindCount)）· \(progress.importedSoFar) 条")
+                        .font(SetmioTokens.Typography.footnote)
+                }
+            }
             if let report = env.syncService.lastReport {
                 LabeledContent("上次导入", value: "\(report.totalImported) 条 · \(report.succeeded ? "成功" : "\(report.failedKinds.count) 类失败")")
             }

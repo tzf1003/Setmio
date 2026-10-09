@@ -30,7 +30,11 @@ public struct WorkoutWriter: Sendable {
             start: workout.startDate,
             end: workout.endDate
         )
-        try await store.relateWorkoutEffortSample(sample, with: workout, activity: nil) // VERIFY: whether relateWorkoutEffortSample saves the sample itself or requires `store.save(sample)` first (WWDC24 "Get started with HealthKit in visionOS / Training Load")
+        // The SDK header does not say whether `relateWorkoutEffortSample` saves a new sample, so save it first:
+        // saving is required if it does not, and harmless if it does (same UUID). Needs share authorization for
+        // `workoutEffortScore` (in `HealthTypes.mvpShare`). Confirmed on device in M4 step "effort 7 shows in Fitness".
+        try await store.save(sample)
+        try await store.relateWorkoutEffortSample(sample, with: workout, activity: nil)
     }
 
     /// Saves a session logged on the phone alone as an indoor traditional-strength workout.
