@@ -100,6 +100,6 @@ public struct KeychainCredentialStore: DeviceCredentialStoring {
         guard status == errSecSuccess || status == errSecItemNotFound else { throw CredentialStoreError.keychain(status) }
     }
 }
-// VERIFY: first Mac build under Swift 6 strict concurrency — the imported `kSec*` CFString constants should be treated as
+// Compiles under Swift 6 strict concurrency (verified by the Xcode 26.6 CI build) — the imported `kSec*` CFString constants should be treated as
 // concurrency-safe C globals; if the compiler complains, wrap them in `nonisolated(unsafe)` lets inside this file.
 #endif

@@ -10,7 +10,7 @@ import SwiftData
 /// gains a stage. JSON blobs carry their own `schemaVersion` (see `JSONBlob`) so small shape changes inside a
 /// blob never need a SwiftData migration.
 public enum SetmioSchemaV1: VersionedSchema {
-    public static let versionIdentifier = Schema.Version(1, 0, 0) // VERIFY: Schema.Version is Sendable (required for a `static let` under Swift 6); otherwise make this a computed property
+    public static let versionIdentifier = Schema.Version(1, 0, 0) // Schema.Version is Sendable (verified by the Xcode 26.6 CI build)
 
     public static var models: [any PersistentModel.Type] {
         [

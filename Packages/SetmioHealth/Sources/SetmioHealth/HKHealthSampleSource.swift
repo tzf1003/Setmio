@@ -7,7 +7,7 @@ import SetmioCore
 /// session classes) touches HealthKit sample objects; everything it returns is a Core value type.
 public final class HKHealthSampleSource: HealthSampleSource, Sendable {
     // HKHealthStore is documented as thread-safe. If the SDK already marks it Sendable this attribute is
-    // redundant but harmless. VERIFY: first Xcode build.
+    // redundant but harmless (verified by the Xcode 26.6 CI build).
     nonisolated(unsafe) let store: HKHealthStore
 
     public init(store: HKHealthStore = HKHealthStore()) {
@@ -46,7 +46,7 @@ public final class HKHealthSampleSource: HealthSampleSource, Sendable {
         let result = try await descriptor.result(for: store)
         let samples = result.addedSamples.compactMap { Self.convert($0, kind: kind) }
         let deleted = result.deletedObjects.map(\.uuid)
-        let newAnchor: HKQueryAnchor? = result.newAnchor // VERIFY: `newAnchor` optionality on HKAnchoredObjectQueryDescriptor.Result
+        let newAnchor: HKQueryAnchor? = result.newAnchor
         return AnchoredBatch(samples: samples, deletedUUIDs: deleted, newAnchor: try Self.archiveAnchor(newAnchor) ?? anchor)
     }
 
@@ -149,7 +149,7 @@ public final class HKHealthSampleSource: HealthSampleSource, Sendable {
 
     /// The most recent user-rated effort score related to `workout`, if any.
     private func effortScore(for workout: HKWorkout) async throws -> Int? {
-        let predicate = HKQuery.predicateForWorkoutEffortSamplesRelated(workout: workout, activity: nil) // VERIFY: iOS 18 predicate name for effort samples related to a workout
+        let predicate = HKQuery.predicateForWorkoutEffortSamplesRelated(workout: workout, activity: nil)
         let descriptor = HKSampleQueryDescriptor(
             predicates: [.quantitySample(type: HKQuantityType(.workoutEffortScore), predicate: predicate)],
             sortDescriptors: [SortDescriptor(\.endDate, order: .reverse)],

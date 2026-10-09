@@ -25,7 +25,7 @@ import SwiftData
 ///   contexts (`@Query` on the main context) see it right away.
 /// - `toDomain()` throws on corrupt rows instead of inventing defaults.
 @ModelActor
-public actor SetmioStore { // VERIFY: @ModelActor on a public actor generates a public init(modelContainer:) and public modelExecutor/modelContainer
+public actor SetmioStore { // @ModelActor generates a public init(modelContainer:) (verified by the Xcode 26.6 CI build)
     /// A HealthKit workout whose start is within this many seconds of a local session's start is treated as the same session.
     public static let workoutMatchToleranceSeconds: TimeInterval = 15 * 60
 

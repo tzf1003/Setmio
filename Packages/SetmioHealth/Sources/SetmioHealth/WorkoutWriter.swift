@@ -45,7 +45,7 @@ public struct WorkoutWriter: Sendable {
         try await builder.addMetadata(Self.metadata(for: session))
         try await builder.endCollection(at: end)
         // Typed as optional on purpose: compiles whether the async overlay returns HKWorkout or HKWorkout?.
-        let finished: HKWorkout? = try await builder.finishWorkout() // VERIFY: async finishWorkout() return type on iOS 26
+        let finished: HKWorkout? = try await builder.finishWorkout()
         guard let workout = finished else { throw WriteError.builderReturnedNoWorkout }
         if let effort = session.effortScore {
             try await writeEffort(effort, for: workout)

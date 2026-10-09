@@ -11,7 +11,7 @@ import SetmioCore
 @MainActor
 public final class MirroringSessionReceiver: NSObject, HKWorkoutSessionDelegate {
     public let messages: AsyncStream<MirroringMessage>
-    nonisolated private let continuation: AsyncStream<MirroringMessage>.Continuation // VERIFY: `nonisolated let` on a Sendable stored property of a @MainActor class (SE-0434)
+    nonisolated private let continuation: AsyncStream<MirroringMessage>.Continuation
 
     public private(set) var activeSession: HKWorkoutSession?
     public private(set) var isConnected = false
@@ -29,7 +29,7 @@ public final class MirroringSessionReceiver: NSObject, HKWorkoutSessionDelegate 
         self.continuation = continuation
         super.init()
         store.workoutSessionMirroringStartHandler = { [weak self] session in
-            let boxed = UncheckedSendable(session) // HKWorkoutSession is handed over once by HealthKit; VERIFY whether the SDK marks it Sendable
+            let boxed = UncheckedSendable(session) // HKWorkoutSession is handed over once by HealthKit (not Sendable in the iOS 26 SDK)
             Task { @MainActor in self?.attach(boxed.value) }
         }
     }

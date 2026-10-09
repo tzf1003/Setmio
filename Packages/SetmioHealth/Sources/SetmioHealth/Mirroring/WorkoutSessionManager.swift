@@ -107,7 +107,7 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         stopElapsedTicker()
         session.end()
         try await builder.endCollection(at: Date())
-        let workout: HKWorkout? = try await builder.finishWorkout() // VERIFY: async finishWorkout() return type on watchOS 26 (optional local compiles either way)
+        let workout: HKWorkout? = try await builder.finishWorkout()
         if let workout, let effort {
             try await WorkoutWriter(store: store).writeEffort(effort, for: workout)
         }
@@ -122,7 +122,7 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
     public func recoverIfNeeded() async {
         guard !isActive else { return }
         do {
-            let recovered: HKWorkoutSession? = try await store.recoverActiveWorkoutSession() // VERIFY: async recoverActiveWorkoutSession() return type (optional local compiles either way)
+            let recovered: HKWorkoutSession? = try await store.recoverActiveWorkoutSession()
             guard let session = recovered else { return }
             let builder = session.associatedWorkoutBuilder()
             session.delegate = self

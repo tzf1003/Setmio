@@ -53,6 +53,10 @@ jobs:
           if [ -n "$XCODE" ]; then sudo xcode-select -s "$XCODE/Contents/Developer"; fi
           xcodebuild -version
           xcrun simctl list runtimes | grep -E "iOS|watchOS" || true
+      - name: Package tests on macOS (SwiftData store, SwiftUI formatters)
+        run: |
+          swift test --package-path Packages/SetmioData
+          swift test --package-path Packages/SetmioUI
       - name: Generate project
         run: |
           brew install xcodegen

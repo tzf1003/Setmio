@@ -130,7 +130,7 @@ public enum HealthTypes {
     @available(iOS 26, *)
     public static var medicationTypes: Set<HKObjectType> {
         #if os(iOS)
-        return [HKObjectType.medicationDoseEventType()] // VERIFY: iOS 26 medication dose event object type accessor name (WWDC25 "Meet the HealthKit Medications API")
+        return [HKObjectType.medicationDoseEventType()]
         #else
         return []
         #endif

@@ -35,7 +35,7 @@ final class AppEnvironment {
     // MARK: Health
 
     #if canImport(HealthKit)
-    nonisolated(unsafe) let healthStore: HKHealthStore // HKHealthStore is documented thread-safe; VERIFY whether the iOS 26 SDK marks it Sendable (then drop the attribute)
+    nonisolated(unsafe) let healthStore: HKHealthStore // HKHealthStore is documented thread-safe
     let realSource: HKHealthSampleSource
     let receiver: MirroringSessionReceiver
     #endif

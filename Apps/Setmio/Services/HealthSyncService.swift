@@ -3,6 +3,7 @@ import Observation
 import SetmioCore
 import SetmioHealth
 import SetmioData
+import HealthKit
 
 // MARK: - Sink (background actor)
 
@@ -11,8 +12,11 @@ import SetmioData
 /// and every other kind only updates a small per-kind cache (the samples themselves are re-read from the
 /// source by `DailyMetricsSource` when the day is aggregated — HealthKit stays the source of truth).
 actor HealthStoreSink: HealthSampleSink {
-    /// `HKWorkoutActivityType` raw values the app treats as strength sessions. // VERIFY: functionalStrengthTraining == 20, traditionalStrengthTraining == 50
-    static let strengthActivityTypes: Set<Int> = [20, 50]
+    /// `HKWorkoutActivityType` raw values the app treats as strength sessions.
+    static let strengthActivityTypes: Set<Int> = [
+        Int(HKWorkoutActivityType.functionalStrengthTraining.rawValue),
+        Int(HKWorkoutActivityType.traditionalStrengthTraining.rawValue),
+    ]
 
     struct Snapshot: Sendable, Equatable {
         var ingestedCounts: [HealthMetricKind: Int] = [:]
@@ -86,7 +90,6 @@ final class HealthSyncService: HealthSampleSink {
     /// sleep/HRV can land late.
     nonisolated static let alwaysRecomputeDays = 2
 
-    // VERIFY: `nonisolated let` on Sendable stored properties of a @MainActor @Observable class (SE-0434).
     nonisolated let store: SetmioStore
     nonisolated let source: any HealthSampleSource
     nonisolated let sink: HealthStoreSink
