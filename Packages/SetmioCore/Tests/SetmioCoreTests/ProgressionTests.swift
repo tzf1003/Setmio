@@ -112,6 +112,71 @@ struct ProgressionEngineTests {
     }
 }
 
+@Suite("Manual logging → next plan (double progression loop)")
+struct ProgressionLoopTests {
+    let engine = ProgressionEngine()
+    let meso = MesocycleState(weekIndex: 1, targetRIR: 2, isDeload: false, weeksTotal: 5)
+    let prescription = ExercisePrescription(exerciseID: Fixture.bench.id, sets: 3, repRange: 8...12)
+
+    /// Plans from the sessions logged so far (most recent session first, as the store returns them).
+    private func plan(after sessions: [[LoggedSet]]) -> PlannedExercise {
+        engine.plan(prescription: prescription, exercise: Fixture.bench, history: ExerciseHistory(sets: sessions.flatMap { $0 }), meso: meso)
+    }
+
+    @Test("a phone-logged session moves the next plan: reps first, then load, then back to the bottom of the range")
+    func fullLoop() {
+        // Session 1 (first ever, no prescribed load): 60 × 8/8/8 @ RIR 2.
+        let first = plan(after: [])
+        #expect(first.sets.first?.targetLoad == nil)
+        let s1 = Fixture.session(exercise: Fixture.bench, load: 60, reps: 8, rir: 2, daysAgo: 6)
+
+        // All sets at the bottom of the range → same load, one more rep.
+        let second = plan(after: [s1])
+        #expect(second.sets.first?.targetLoad == 60)
+        #expect(second.sets.first?.targetReps == 9...12)
+
+        // Session 2 reaches 12/12/12 at the target RIR → add one plate step, reset to the bottom of the range.
+        let s2 = Fixture.session(exercise: Fixture.bench, load: 60, reps: 12, rir: 2, daysAgo: 3)
+        let third = plan(after: [s2, s1])
+        #expect(third.decision == .increaseLoad(by: 2.5))
+        #expect(third.sets.first?.targetLoad == 62.5)
+        #expect(third.sets.first?.targetReps == 8...12)
+
+        // Session 3 at the heavier load, 9/9/9: no further jump, aim for 10.
+        let s3 = Fixture.session(exercise: Fixture.bench, load: 62.5, reps: 9, rir: 2, daysAgo: 0)
+        let fourth = plan(after: [s3, s2, s1])
+        #expect(fourth.sets.first?.targetLoad == 62.5)
+        #expect(fourth.sets.first?.targetReps == 10...12)
+    }
+
+    @Test("hitting the top of the range with too little reserve does not add load")
+    func topOfRangeButGrinding() {
+        let grind = Fixture.session(exercise: Fixture.bench, load: 60, reps: 12, rir: 0, daysAgo: 3)
+        let planned = plan(after: [grind])
+        #expect(planned.sets.first?.targetLoad == 60)
+        if case .increaseLoad = planned.decision { Issue.record("must not increase load at RIR 0 when target RIR is 2") }
+    }
+
+    @Test("warm-up sets never drive progression")
+    func warmupsIgnored() {
+        let working = Fixture.session(exercise: Fixture.bench, load: 60, reps: 9, rir: 2, daysAgo: 3)
+        var warmup = Fixture.session(exercise: Fixture.bench, load: 20, reps: 12, rir: 5, sets: 1, daysAgo: 3)
+        warmup[0].isWarmup = true
+        let planned = plan(after: [warmup + working])
+        #expect(planned.sets.first?.targetLoad == 60)
+        #expect(planned.sets.first?.targetReps == 10...12)
+    }
+
+    @Test("three sessions below the minimum reps → failure deload at 90% and half the sets")
+    func repeatedFailure() {
+        let sessions = (0..<3).map { Fixture.session(exercise: Fixture.bench, load: 80, reps: 6, rir: 1, daysAgo: 2 + $0 * 3) }
+        let planned = plan(after: sessions)
+        #expect(planned.decision == .deload(.repeatedFailure))
+        #expect(planned.sets.first?.targetLoad == 72.5)   // 80 × 0.9 = 72 → nearest 2.5
+        #expect(planned.sets.count == 2)                  // ceil(3 × 0.5)
+    }
+}
+
 @Suite("ReadinessModulator")
 struct ReadinessModulatorTests {
     private func session(sets: Int, load: Double) -> PlannedSession {

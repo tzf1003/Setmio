@@ -211,6 +211,20 @@ final class AppEnvironment {
         if demoChanged { await useDemoData(new.demoDataEnabled) }
     }
 
+    /// Finishes first-launch onboarding: stores the profile and starts a mesocycle from `program`.
+    /// Returns an error message (profile is kept only when both steps succeed), nil on success.
+    func completeOnboarding(profile new: UserProfile, program: ProgramTemplate) async -> String? {
+        do {
+            try await planner.startMesocycle(program: program, startDay: today)
+            try await store.saveProfile(new)
+        } catch {
+            return "无法完成初始化：\(error.localizedDescription)"
+        }
+        profile = new
+        await refreshTodayPlan()
+        return nil
+    }
+
     func saveProfile(_ new: UserProfile) async {
         profile = new
         do {

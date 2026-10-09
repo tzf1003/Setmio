@@ -40,7 +40,7 @@ struct TrainingView: View {
             .refreshable { await load() }
             .sheet(isPresented: $showLogSheet) {
                 if let session = phoneSession {
-                    LogSetSheet(exercises: exercises, nextIndex: session.sets.count, defaultExercise: env.todayPlan?.exercises.first?.exerciseID) { set in
+                    LogSetSheet(exercises: exercises, nextIndex: session.sets.count, plan: env.todayPlan) { set in
                         await log(set, into: session)
                     }
                 }
@@ -244,7 +244,8 @@ struct TrainingView: View {
 private struct LogSetSheet: View {
     let exercises: [Exercise]
     let nextIndex: Int
-    let defaultExercise: SetmioCore.ID<Exercise>?
+    /// Today's plan: the picker starts on its first exercise and the fields are prefilled from its first set.
+    let plan: PlannedSession?
     let onSave: (LoggedSet) async -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -298,9 +299,21 @@ private struct LogSetSheet: View {
                 }
             }
             .onAppear {
-                if exerciseID == nil { exerciseID = defaultExercise ?? exercises.first?.id }
+                if exerciseID == nil { exerciseID = plan?.exercises.first?.exerciseID ?? exercises.first?.id }
+                prefill()
             }
+            .onChange(of: exerciseID) { prefill() }
         }
+    }
+}
+
+private extension LogSetSheet {
+    /// Fills the steppers from the plan's first set for the selected exercise (the user edits what they actually did).
+    func prefill() {
+        guard let target = plan?.exercises.first(where: { $0.exerciseID == exerciseID })?.sets.first(where: { !$0.isWarmup }) else { return }
+        if let planned = target.targetLoad { load = planned }
+        reps = target.targetReps.lowerBound
+        rir = target.targetRIR
     }
 }
 

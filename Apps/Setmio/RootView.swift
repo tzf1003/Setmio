@@ -22,6 +22,12 @@ struct RootView: View {
                 SettingsView()
             }
         }
+        .fullScreenCover(isPresented: Binding(
+            get: { env.isBootstrapped && env.profile == nil },
+            set: { _ in }
+        )) {
+            OnboardingView()
+        }
         .overlay(alignment: .top) {
             if let error = env.startupError {
                 Text(error)
