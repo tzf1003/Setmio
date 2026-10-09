@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import SetmioCore
 import SetmioUI
 
 #if canImport(ActivityKit)
@@ -13,6 +14,8 @@ import ActivityKit
 final class RestTimerActivityController {
     private(set) var lastError: String?
     private var activity: Activity<RestTimerActivityAttributes>?
+    /// The last content pushed, so pause / resume / +30 s keep the labels.
+    private var lastContent: RestTimerActivityAttributes.ContentState?
 
     var isEnabled: Bool {
         ActivityAuthorizationInfo().areActivitiesEnabled
@@ -27,6 +30,7 @@ final class RestTimerActivityController {
     func startOrUpdate(sessionID: UUID, exerciseName: String, state: RestTimerActivityAttributes.ContentState) async {
         guard isEnabled else { return }
         let content = ActivityContent(state: state, staleDate: state.endDate.addingTimeInterval(120))
+        lastContent = state
 
         if let current = activity,
            current.activityState == .active,
@@ -51,7 +55,29 @@ final class RestTimerActivityController {
         }
     }
 
+    /// The timer as the activity currently shows it (nil without a running activity).
+    var currentTimer: RestTimerState? {
+        guard activity != nil, let content = lastContent else { return nil }
+        return RestTimerState(endDate: content.endDate, totalSeconds: content.remaining(), pausedRemaining: content.isPaused ? content.pausedRemaining : nil)
+    }
+
+    /// Shows `timer` (the watch's authoritative state) in the activity, or ends it when the rest is over (`nil`).
+    func apply(_ timer: RestTimerState?, now: Date = Date()) async {
+        guard let timer else {
+            await end()
+            return
+        }
+        guard let current = activity, var content = lastContent else { return }
+        content.endDate = timer.endDate
+        content.isPaused = timer.isPaused
+        content.pausedRemaining = timer.pausedRemaining
+        lastContent = content
+        nonisolated(unsafe) let unsafeActivity = current
+        await unsafeActivity.update(ActivityContent(state: content, staleDate: content.endDate.addingTimeInterval(120)))
+    }
+
     func end() async {
+        lastContent = nil
         guard let current = activity else { return }
         self.activity = nil
         nonisolated(unsafe) let unsafeActivity = current

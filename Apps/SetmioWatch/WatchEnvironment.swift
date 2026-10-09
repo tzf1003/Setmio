@@ -12,12 +12,15 @@ import HealthKit
 @Observable
 final class WatchEnvironment {
     struct RestTimer: Equatable, Sendable {
-        var endDate: Date
-        var totalSeconds: TimeInterval
+        var state: RestTimerState
         var exerciseName: String
 
+        var endDate: Date { state.endDate }
+        var totalSeconds: TimeInterval { state.totalSeconds }
+        var isPaused: Bool { state.isPaused }
+
         func remaining(at now: Date = Date()) -> TimeInterval {
-            max(0, endDate.timeIntervalSince(now))
+            state.remaining(at: now)
         }
     }
 
@@ -73,14 +76,34 @@ final class WatchEnvironment {
         #if canImport(HealthKit)
         await sessionManager.recoverIfNeeded()
         if sessionManager.isActive, activeSession == nil {
-            // Recovered HealthKit session: the sets live in the journal; rebuild what we can.
-            activeSession = LoggedSession(plannedSessionID: plan.id, start: Date().addingTimeInterval(-sessionManager.elapsed), origin: .watch)
+            await restoreActiveSession()
         }
         #endif
         connectivity.activate()
         await haptics.requestNotificationAuthorization()
         await replayJournal()
     }
+
+    #if canImport(HealthKit)
+    /// After a crash with a live `HKWorkoutSession`: rebuild the session (same id, sets) from the journal so
+    /// later sets and `.sessionEnded` stay attached to what the phone already has.
+    private func restoreActiveSession() async {
+        let messages = (try? await journal.allMessages()) ?? []
+        let recovered = SessionRecovery.unfinishedSession(from: messages)
+        var session = LoggedSession(
+            id: recovered?.sessionID ?? SetmioCore.ID(),
+            plannedSessionID: plan.id,
+            start: sessionManager.sessionStartDate ?? Date(),
+            origin: .watch
+        )
+        session.sets = recovered?.sets ?? []
+        activeSession = session
+        selectedExerciseID = nil
+        currentExerciseIndex = plan.exercises.firstIndex { planned in
+            session.sets.filter { $0.exerciseID == planned.exerciseID }.count < planned.sets.count
+        } ?? plan.exercises.count
+    }
+    #endif
 
     // MARK: Derived state
 
@@ -194,7 +217,7 @@ final class WatchEnvironment {
         skipRest()
         #if canImport(HealthKit)
         do {
-            let workout = try await sessionManager.end(effort: effort)
+            let workout = try await sessionManager.end(effort: effort, metadata: WorkoutWriter.metadata(for: session))
             session.hkWorkoutUUID = workout?.uuid
         } catch {
             lastError = "结束训练时出错：\(error.localizedDescription)"
@@ -210,29 +233,58 @@ final class WatchEnvironment {
 
     func startRest(seconds: TimeInterval) {
         guard seconds > 0 else { return }
-        let name = currentExerciseName
-        restTimer = RestTimer(endDate: Date().addingTimeInterval(seconds), totalSeconds: seconds, exerciseName: name)
+        restTimer = RestTimer(state: RestTimerState(startingAt: Date(), seconds: seconds), exerciseName: currentExerciseName)
         scheduleRestCues()
     }
 
     func extendRest(by seconds: TimeInterval = 30) {
         guard var timer = restTimer else { return }
-        timer.endDate = timer.endDate.addingTimeInterval(seconds)
-        timer.totalSeconds += seconds
+        timer.state = timer.state.extended(by: seconds, at: Date())
         restTimer = timer
         scheduleRestCues()
+        reportRestTimer()
+    }
+
+    func pauseRest() {
+        guard var timer = restTimer, !timer.isPaused else { return }
+        timer.state = timer.state.paused(at: Date())
+        restTimer = timer
+        scheduleRestCues()   // cancels the pending cues while paused
+        reportRestTimer()
+    }
+
+    func resumeRest() {
+        guard var timer = restTimer, timer.isPaused else { return }
+        timer.state = timer.state.resumed(at: Date())
+        restTimer = timer
+        scheduleRestCues()
+        reportRestTimer()
     }
 
     func skipRest() {
+        let hadTimer = restTimer != nil
         restTask?.cancel()
         restTask = nil
         restTimer = nil
         haptics.cancelScheduledNotifications()
+        if hadTimer { reportRestTimer() }
+    }
+
+    /// Tells the phone's Live Activity what the timer looks like now (`nil` = no rest). Best effort: the phone
+    /// started its own countdown from `.setLogged`, this only corrects it after pause / resume / +30 s / skip.
+    private func reportRestTimer() {
+        #if canImport(HealthKit)
+        guard sessionManager.mirroringConnected else { return }
+        let state = restTimer?.state
+        Task { try? await sessionManager.send(.restTimerChanged(state)) }
+        #endif
     }
 
     private func scheduleRestCues() {
         restTask?.cancel()
-        guard let timer = restTimer else { return }
+        restTask = nil
+        haptics.cancelScheduledNotifications()
+        guard let timer = restTimer, !timer.isPaused else { return }
         haptics.scheduleRestOverNotification(at: timer.endDate, exerciseName: timer.exerciseName)
         restTask = Task { [weak self] in
             let warnAt = timer.endDate.addingTimeInterval(-Self.warningLeadSeconds)
@@ -250,6 +302,7 @@ final class WatchEnvironment {
             self.haptics.play(.finished)
             self.restTimer = nil
             self.restTask = nil
+            self.reportRestTimer()
         }
     }
 
@@ -314,10 +367,11 @@ final class WatchEnvironment {
             switch command {
             case .skip: skipRest()
             case .add30: extendRest(by: 30)
-            case .pause, .resume: break // V2: pause support lives with the Live Activity buttons
+            case .pause: pauseRest()
+            case .resume: resumeRest()
             }
 
-        case .hello, .setLogged, .setDeleted, .sessionEnded:
+        case .hello, .setLogged, .setDeleted, .sessionEnded, .restTimerChanged:
             break // watch → phone only
         }
     }

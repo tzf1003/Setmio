@@ -280,6 +280,9 @@ final class AppEnvironment {
         #if canImport(HealthKit)
         let host = mirroringHost
         host.todayPlan = { [weak self] in self?.todayPlan }
+        RestTimerCommandCenter.handler = { [weak host] action in
+            await host?.handleActivityAction(action)
+        }
         // Fallback transport: envelopes that arrive over WatchConnectivity are handled by the same host, and
         // replies go back the same way.
         connectivityBridge.onEnvelope = { [weak host] envelope in

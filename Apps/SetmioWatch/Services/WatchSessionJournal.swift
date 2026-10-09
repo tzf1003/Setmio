@@ -56,7 +56,7 @@ public actor WatchSessionJournal {
         case .setLogged(let set, _): set.id.rawValue
         case .setDeleted(let id): id.rawValue
         case .sessionEnded(let session): session.id.rawValue
-        case .hello, .ack, .planUpdated, .restTimerCommand: nil
+        case .hello, .ack, .planUpdated, .restTimerCommand, .restTimerChanged: nil
         }
     }
 
@@ -108,6 +108,18 @@ public actor WatchSessionJournal {
             }
         }
         return order.compactMap { entries[$0] }.filter { !$0.acked }
+    }
+
+    /// Every journaled message in append order, acked or not (an acked set still belongs to a running session).
+    public func allMessages() throws -> [MirroringMessage] {
+        var order: [UUID] = []
+        var entries: [UUID: Entry] = [:]
+        for line in try readLines() {
+            guard let entry = line.entry else { continue }
+            if entries[entry.id] == nil { order.append(entry.id) }
+            entries[entry.id] = entry
+        }
+        return order.compactMap { entries[$0]?.envelope.message }
     }
 
     /// Total entries recorded in the file (acked or not).

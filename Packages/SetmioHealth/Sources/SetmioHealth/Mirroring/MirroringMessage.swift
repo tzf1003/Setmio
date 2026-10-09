@@ -26,6 +26,9 @@ public enum MirroringMessage: Codable, Sendable, Equatable {
     case planUpdated(PlannedSession)
     /// Phone → watch: Live Activity button pressed.
     case restTimerCommand(RestTimerCommand)
+    /// Watch → phone: the rest timer changed (started, paused, resumed, extended) — or ended / was skipped (`nil`).
+    /// Best effort and never journaled: the watch stays the source of truth, the phone only mirrors it.
+    case restTimerChanged(RestTimerState?)
 
     public var isAck: Bool {
         if case .ack = self { return true }

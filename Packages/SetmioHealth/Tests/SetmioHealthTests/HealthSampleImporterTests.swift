@@ -335,6 +335,8 @@ struct MirroringEnvelopeTests {
             .ack(ids: [loggedSet.id.rawValue, sessionID.rawValue]),
             .planUpdated(plan),
             .restTimerCommand(.add30),
+            .restTimerChanged(RestTimerState(endDate: Date(timeIntervalSince1970: 1_790_000_100), totalSeconds: 120, pausedRemaining: 45)),
+            .restTimerChanged(nil),
         ]
     }
 
@@ -490,5 +492,49 @@ struct FakeHealthSampleSourceTests {
         let second = try await source.anchoredSamples(of: .steps, since: first.newAnchor, limit: 10)
         #expect(second.samples.count == 1)
         #expect(FakeHealthSampleSource.offset(from: second.newAnchor) == 3)
+    }
+}
+
+
+// MARK: - SessionRecovery
+
+@Suite("SessionRecovery 训练中崩溃恢复")
+struct SessionRecoveryTests {
+    private func set(_ session: ID<LoggedSession>, _ index: Int, minute: Int) -> LoggedSet {
+        LoggedSet(sessionID: session, exerciseID: ID(), index: index, load: 60, reps: 10, rir: 2,
+                  completedAt: Date(timeIntervalSince1970: 1_790_000_000 + Double(minute) * 60))
+    }
+
+    @Test("没有日志 → 没有可恢复的训练")
+    func empty() {
+        #expect(SessionRecovery.unfinishedSession(from: []) == nil)
+        #expect(SessionRecovery.unfinishedSession(from: [.hello(watchAppVersion: "1", planVersion: nil), .ack(ids: [UUID()])]) == nil)
+    }
+
+    @Test("未结束的训练：返回其全部组（含已确认的），重发合并，已删除的剔除")
+    func unfinished() {
+        let id = ID<LoggedSession>()
+        let a = set(id, 0, minute: 0), b = set(id, 1, minute: 4), c = set(id, 2, minute: 8)
+        let messages: [MirroringMessage] = [
+            .hello(watchAppVersion: "1", planVersion: 3),
+            .setLogged(a, restSeconds: 90), .ack(ids: [a.id.rawValue]),
+            .setLogged(b, restSeconds: 90), .setLogged(b, restSeconds: 90),
+            .setLogged(c, restSeconds: 90), .setDeleted(b.id),
+        ]
+        let recovered = SessionRecovery.unfinishedSession(from: messages)
+        #expect(recovered?.sessionID == id)
+        #expect(recovered?.sets.map(\.id) == [a.id, c.id])
+    }
+
+    @Test("已发送 sessionEnded 的训练不再恢复；多个未结束时取最近的")
+    func endedAndNewest() {
+        let old = ID<LoggedSession>(), finished = ID<LoggedSession>(), current = ID<LoggedSession>()
+        let ended = LoggedSession(id: finished, start: Date(timeIntervalSince1970: 1_790_000_000), end: Date(timeIntervalSince1970: 1_790_003_600), origin: .watch)
+        let messages: [MirroringMessage] = [
+            .setLogged(set(old, 0, minute: 0), restSeconds: 90),
+            .setLogged(set(finished, 0, minute: 10), restSeconds: 90), .sessionEnded(ended),
+            .setLogged(set(current, 0, minute: 120), restSeconds: 90),
+        ]
+        #expect(SessionRecovery.unfinishedSession(from: messages)?.sessionID == current)
     }
 }

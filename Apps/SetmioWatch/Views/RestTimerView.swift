@@ -12,7 +12,7 @@ struct RestTimerView: View {
                 let remaining = timer.remaining(at: context.date)
                 let fraction = timer.totalSeconds > 0 ? remaining / timer.totalSeconds : 0
                 VStack(spacing: SetmioTokens.Spacing.sm) {
-                    Text("休息")
+                    Text(timer.isPaused ? "休息（已暂停）" : "休息")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     ZStack {
@@ -33,6 +33,10 @@ struct RestTimerView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                     HStack(spacing: SetmioTokens.Spacing.sm) {
+                        Button(timer.isPaused ? "继续" : "暂停") {
+                            if timer.isPaused { env.resumeRest() } else { env.pauseRest() }
+                        }
+                        .buttonStyle(.bordered)
                         Button("+30s") { env.extendRest(by: 30) }
                             .buttonStyle(.bordered)
                         Button("跳过") { env.skipRest() }

@@ -33,6 +33,7 @@ targets:
     platform: iOS
     sources:
       - Apps/Setmio
+      - Apps/Shared   # Live Activity intents, compiled into the app (runs them) and the widget (renders buttons)
     dependencies:
       - package: SetmioCore
       - package: SetmioData
@@ -107,6 +108,7 @@ targets:
     platform: iOS
     sources:
       - Apps/SetmioWidgets
+      - Apps/Shared
     dependencies:
       - package: SetmioCore
       - package: SetmioUI

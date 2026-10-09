@@ -6,7 +6,7 @@ import SetmioUI
 
 /// Lock Screen / Dynamic Island rendering of `RestTimerActivityAttributes` (declared in SetmioUI so the app and
 /// this extension share one type). While running, `Text(timerInterval:countsDown:)` counts down on its own;
-/// paused shows the frozen remainder. Buttons (pause / skip via AppIntent → mirroring) are V2.
+/// paused shows the frozen remainder. Buttons (pause / +30 s / skip) are AppIntents that go via the app to the watch.
 struct RestTimerLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RestTimerActivityAttributes.self) { context in
@@ -32,11 +32,14 @@ struct RestTimerLiveActivity: Widget {
                         .frame(minWidth: 72, alignment: .trailing)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    if let next = context.state.nextTarget {
-                        Text(next)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                    VStack(spacing: SetmioTokens.Spacing.xs) {
+                        if let next = context.state.nextTarget {
+                            Text(next)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        RestControls(isPaused: context.state.isPaused)
                     }
                 }
             } compactLeading: {
@@ -81,12 +84,37 @@ private struct LockScreenView: View {
                 }
             }
             Spacer(minLength: SetmioTokens.Spacing.sm)
-            TimerText(state: context.state)
-                .font(SetmioTokens.Typography.largeNumber)
-                .foregroundStyle(SetmioTokens.Colors.accent)
-                .frame(minWidth: 96, alignment: .trailing)
+            VStack(alignment: .trailing, spacing: SetmioTokens.Spacing.xs) {
+                TimerText(state: context.state)
+                    .font(SetmioTokens.Typography.largeNumber)
+                    .foregroundStyle(SetmioTokens.Colors.accent)
+                    .frame(minWidth: 96, alignment: .trailing)
+                RestControls(isPaused: context.state.isPaused)
+            }
         }
         .padding(SetmioTokens.Spacing.lg)
+    }
+}
+
+/// Pause / resume, +30 s and skip. Each button is a `LiveActivityIntent` that runs in the app, which forwards the
+/// command to the watch (the owner of the timer).
+private struct RestControls: View {
+    let isPaused: Bool
+
+    var body: some View {
+        HStack(spacing: SetmioTokens.Spacing.sm) {
+            if isPaused {
+                Button(intent: ResumeRestIntent()) { Label("继续", systemImage: "play.fill") }
+            } else {
+                Button(intent: PauseRestIntent()) { Label("暂停", systemImage: "pause.fill") }
+            }
+            Button(intent: AddThirtySecondsIntent()) { Label("+30s", systemImage: "plus") }
+            Button(intent: SkipRestIntent()) { Label("跳过", systemImage: "forward.end.fill") }
+        }
+        .font(.caption)
+        .buttonStyle(.bordered)
+        .labelStyle(.titleAndIcon)
+        .tint(SetmioTokens.Colors.accent)
     }
 }
 

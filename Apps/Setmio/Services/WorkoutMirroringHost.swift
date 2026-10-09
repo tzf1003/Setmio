@@ -83,6 +83,10 @@ final class WorkoutMirroringHost {
                 await activity.end()
                 activeSessionID = nil
 
+            case .restTimerChanged(let timer):
+                // The watch is the source of truth: it corrects whatever the phone showed optimistically.
+                await activity.apply(timer)
+
             case .ack, .planUpdated, .restTimerCommand:
                 // Phone → watch only; ignore if the watch echoes one back.
                 break
@@ -104,6 +108,26 @@ final class WorkoutMirroringHost {
     /// Live Activity buttons (V2) route here; the watch stays the source of truth for the timer.
     func sendRestTimerCommand(_ command: RestTimerCommand) async {
         try? await reply(.restTimerCommand(command), via: .mirroring)
+    }
+
+    /// A Live Activity button was pressed. The phone updates the activity right away (the intent must feel instant)
+    /// and tells the watch, whose `.restTimerChanged` reply then confirms or corrects the displayed state.
+    func handleActivityAction(_ action: RestTimerAction) async {
+        let now = Date()
+        switch action {
+        case .pause:
+            if let timer = activity.currentTimer { await activity.apply(timer.paused(at: now)) }
+            await sendRestTimerCommand(.pause)
+        case .resume:
+            if let timer = activity.currentTimer { await activity.apply(timer.resumed(at: now)) }
+            await sendRestTimerCommand(.resume)
+        case .add30:
+            if let timer = activity.currentTimer { await activity.apply(timer.extended(by: 30, at: now)) }
+            await sendRestTimerCommand(.add30)
+        case .skip:
+            await activity.apply(nil)
+            await sendRestTimerCommand(.skip)
+        }
     }
 
     // MARK: Private

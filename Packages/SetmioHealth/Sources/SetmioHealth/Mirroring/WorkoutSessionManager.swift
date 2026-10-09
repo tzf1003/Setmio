@@ -45,6 +45,9 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         super.init()
     }
 
+    /// When the underlying `HKWorkoutSession` started (also after `recoverIfNeeded`).
+    public var sessionStartDate: Date? { session?.startDate }
+
     public var isActive: Bool {
         switch state {
         case .preparing, .running, .paused, .ending: true
@@ -101,12 +104,17 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
     }
 
     /// Ends the session, finishes the workout and (optionally) writes the effort score. Returns the saved workout.
-    public func end(effort: Int?) async throws -> HKWorkout? {
+    /// `metadata` is attached to the `HKWorkout` (see `WorkoutWriter.metadata(for:)`), so the phone's importer can
+    /// match it to the logged session by `com.setmio.sessionID` instead of by start time.
+    public func end(effort: Int?, metadata: [String: Any] = [:]) async throws -> HKWorkout? {
         guard let session, let builder else { return nil }
         state = .ending
         stopElapsedTicker()
         session.end()
         try await builder.endCollection(at: Date())
+        if !metadata.isEmpty {
+            try await builder.addMetadata(metadata)
+        }
         let workout: HKWorkout? = try await builder.finishWorkout()
         if let workout, let effort {
             try await WorkoutWriter(store: store).writeEffort(effort, for: workout)
@@ -131,6 +139,13 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
             self.builder = builder
             apply(sessionState: session.state)
             startElapsedTicker()
+            // The old mirroring channel died with the process; best-effort re-establish (WatchConnectivity covers the gap).
+            do {
+                try await session.startMirroringToCompanionDevice()
+                mirroringConnected = true
+            } catch {
+                mirroringConnected = false
+            }
         } catch {
             state = .failed(error.localizedDescription)
         }
