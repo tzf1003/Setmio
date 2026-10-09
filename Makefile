@@ -2,7 +2,7 @@ XCODEGEN ?= xcodegen
 PROJECT   = Setmio.xcodeproj
 SIM_DEST ?= platform=iOS Simulator,name=iPhone 17
 
-.PHONY: help bootstrap generate test-core test-ai test-data test-health test-ui test-packages build-ios build-watch test-ios proxy-install proxy-dev proxy-test clean
+.PHONY: test-app-ui help bootstrap generate test-core test-ai test-data test-health test-ui test-packages build-ios build-watch test-ios proxy-install proxy-dev proxy-test clean
 
 help:
 	@echo "make bootstrap      - install xcodegen (brew), create Local.xcconfig, generate project, npm install proxy"
@@ -13,6 +13,7 @@ help:
 	@echo "make build-ios      - xcodebuild the iOS app (macOS only)"
 	@echo "make build-watch    - xcodebuild the watchOS app (macOS only)"
 	@echo "make test-ios       - run SetmioTests on the simulator (macOS only)"
+	@echo "make test-app-ui  - simulator UI walk-through: onboarding + demo data -> readiness (screenshots in build/SetmioUI.xcresult)"
 	@echo "make proxy-test     - vitest for proxy/"
 
 bootstrap:
@@ -45,7 +46,12 @@ build-watch: generate
 	xcodebuild -project $(PROJECT) -scheme SetmioWatch -destination 'generic/platform=watchOS' -configuration Debug build CODE_SIGNING_ALLOWED=NO
 
 test-ios: generate
-	xcodebuild test -project $(PROJECT) -scheme Setmio -destination '$(SIM_DEST)'
+	xcodebuild test -project $(PROJECT) -scheme Setmio -destination '$(SIM_DEST)' CODE_SIGNING_ALLOWED=NO
+
+test-app-ui: generate
+	rm -rf build/SetmioUI.xcresult
+	-xcrun simctl uninstall booted com.tzf1003.setmio 2>/dev/null   # first-launch state: onboarding must appear
+	xcodebuild test -project $(PROJECT) -scheme SetmioUI -destination '$(SIM_DEST)' -resultBundlePath build/SetmioUI.xcresult CODE_SIGNING_ALLOWED=NO
 
 proxy-install:
 	npm --prefix proxy install

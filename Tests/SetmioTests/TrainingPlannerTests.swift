@@ -60,8 +60,17 @@ struct TrainingPlannerTests {
         try await store.upsertLoggedSession(session)
         try await store.upsertLoggedSets(sets, into: session.id)
 
-        let day2 = day1.adding(days: 1, calendar: calendar)
+        // The planner rotates through the program days by finished sessions, so complete one full rotation
+        // (the other days are empty finished sessions) before the same program day comes around again.
+        for offset in 1..<program.days.count {
+            let day = day1.adding(days: offset, calendar: calendar)
+            let filler = day.date(atHour: 18, calendar: calendar)
+            try await store.upsertLoggedSession(LoggedSession(start: filler, end: filler.addingTimeInterval(3600), origin: .phone))
+        }
+
+        let day2 = day1.adding(days: program.days.count, calendar: calendar)
         let plan2 = try #require(try await planner.plan(for: day2, now: day2.date(atHour: 8, calendar: calendar), calendar: calendar))
+        #expect(plan2.dayNameZH == plan1.dayNameZH)
         let progressed = try #require(plan2.exercises.first { $0.exerciseID == first.exerciseID })
         let load = try #require(progressed.sets.first?.targetLoad)
         #expect(load > 60, "load should increase after topping the rep range, got \(load)")

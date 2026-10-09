@@ -48,14 +48,16 @@ npm install && npm run dev                   # 本地 Node 运行；wrangler dev
 
 ## 状态
 
-阶段 0 完成：方案、五个包、iOS / watchOS / Widget 目标与 proxy 均已就绪，CI 全绿。
+阶段 1 MVP：**代码与模拟器验收完成，等待真机清单**（[`docs/DEVICE_CHECKLIST.md`](docs/DEVICE_CHECKLIST.md)；通过后在 `docs/方案.md` §8 标记阶段 1 完成）。
 
 | 检查 | 结果 |
 |---|---|
-| Linux 包测试（Core / AI / Health / Data / UI） | 91 个测试通过 |
-| macOS 包测试（SwiftData 存储层 + 格式化） | 17 + 7 个测试通过 |
-| proxy（typecheck + vitest） | 18 个测试通过 |
-| Xcode 26.6：iOS 构建（含 watch App 与 Widget）、watchOS 构建 | BUILD SUCCEEDED |
-| iOS 26.5 模拟器宿主测试 | TEST SUCCEEDED |
+| 包测试（Core 52 / AI 15 / Data 21 / Health 24 / UI 7） | 通过 |
+| Xcode：iOS 构建（含 watch App 与 Widget）、watchOS 构建 | BUILD SUCCEEDED |
+| iOS 模拟器宿主测试（含训练规划闭环） | TEST SUCCEEDED（5 个） |
+| 模拟器 UI 走查 `make test-app-ui`（引导 → 演示数据 → 准备度） | 通过 |
+| 真机：HealthKit / 手表训练 / Live Activity | 待验证 |
 
-下一步是阶段 1 MVP 的真机开发，按 [`docs/GOAL.md`](docs/GOAL.md) 在本地用 Claude Code 的 goal 推进。
+已落地：首次启动引导（档案 → 健康授权 → 模板）、按计划预填的记组、60 天导入进度条、锁屏后台投递所需的文件保护、
+手表训练会话与镜像、崩溃恢复（日志回放）、休息计时暂停/继续与 Live Activity 按钮。
+`// VERIFY` 的处理结果见 [`docs/GOAL.md`](docs/GOAL.md) 末尾。

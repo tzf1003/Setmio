@@ -30,3 +30,4 @@ proxy/coverage/
 *.swp
 .idea/
 .vscode/
+build/

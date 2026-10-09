@@ -152,7 +152,24 @@ targets:
         product: SetmioHealthTesting
       - package: SetmioUI
 
+  SetmioUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - Tests/SetmioUITests
+    dependencies:
+      - target: Setmio
+
 schemes:
+  # Simulator walk-through of onboarding + demo data (make test-app-ui). Kept out of the Setmio scheme so CI stays fast.
+  SetmioUI:
+    build:
+      targets:
+        Setmio: all
+    test:
+      config: Debug
+      targets:
+        - SetmioUITests
   Setmio:
     build:
       targets:
