@@ -18,6 +18,8 @@ public final class MirroringSessionReceiver: NSObject, HKWorkoutSessionDelegate 
     public private(set) var remoteState: HKWorkoutSessionState = .notStarted
     /// Set when the remote session ends or disconnects, so the host can finalise the local session.
     public var onSessionClosed: (@MainActor (HKWorkoutSession) -> Void)?
+    /// Called when a watch session attaches, so the host can show the mirroring state before the first set arrives.
+    public var onAttach: (@MainActor (HKWorkoutSession) -> Void)?
 
     private let store: HKHealthStore
     private var sequencer = MirroringSequencer()
@@ -57,6 +59,7 @@ public final class MirroringSessionReceiver: NSObject, HKWorkoutSessionDelegate 
         isConnected = true
         remoteState = session.state
         sequencer = MirroringSequencer()
+        onAttach?(session)
     }
 
     private func close(_ session: HKWorkoutSession) {

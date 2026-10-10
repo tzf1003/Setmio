@@ -229,6 +229,21 @@ struct ModelContainerTests {
         #expect(try await store.bodyMeasurements(from: when.addingTimeInterval(-60), to: when.addingTimeInterval(60)).isEmpty)
     }
 
+    @Test("行数统计：同一批样本再次写入（即重新导入）行数不变")
+    func rowCountsUnchangedOnReimport() async throws {
+        let store = try makeStore()
+        let when = Self.day.date(atHour: 7, calendar: Self.calendar)
+        let rows = (0..<5).map { index in
+            BodyMeasurement(hkUUID: UUID(), date: when.addingTimeInterval(Double(index) * 60), weight: 80, source: "com.apple.Health")
+        }
+        _ = try await store.upsertBodyMeasurements(rows)
+        let first = try await store.rowCounts()
+        #expect(first.bodyMeasurements == 5)
+
+        _ = try await store.upsertBodyMeasurements(rows)   // the re-import delivers the same hkUUIDs again
+        #expect(try await store.rowCounts() == first)
+    }
+
     @Test("导入 HealthKit 训练：按时间对账，再次导入已知，无匹配则占位")
     func markWorkoutImportedReconciles() async throws {
         let store = try makeStore()

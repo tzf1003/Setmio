@@ -29,6 +29,7 @@ struct TrainingView: View {
             List {
                 mesocycleSection
                 todaySection
+                watchSection
                 phoneLoggingSection
                 historySection
                 if let error {
@@ -38,6 +39,8 @@ struct TrainingView: View {
             .navigationTitle("训练")
             .task { await load() }
             .refreshable { await load() }
+            .onChange(of: env.isWatchMirroring) { _, _ in Task { await load() } }
+            .onChange(of: env.watchSetsReceived) { _, _ in Task { await load() } }
             .sheet(isPresented: $showLogSheet) {
                 if let session = phoneSession {
                     LogSetSheet(exercises: exercises, nextIndex: session.sets.count, plan: env.todayPlan) { set in
@@ -87,6 +90,22 @@ struct TrainingView: View {
                     }
                 }
                 .tint(.primary)
+            }
+        }
+    }
+
+    /// Live watch state: visible while a workout is mirrored, so the user can see the phone picked it up.
+    @ViewBuilder
+    private var watchSection: some View {
+        if env.isWatchMirroring || env.watchSetsReceived > 0 {
+            Section("手表") {
+                if env.isWatchMirroring {
+                    Label("手表训练进行中（已镜像到 iPhone）", systemImage: "applewatch")
+                        .foregroundStyle(SetmioTokens.Colors.positive)
+                }
+                Text("本次连接已收到 \(env.watchSetsReceived) 组")
+                    .font(SetmioTokens.Typography.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -173,6 +192,11 @@ struct TrainingView: View {
                     Text("\(session.sets.filter { !$0.isWarmup }.count) 组 · 总量 \(SetmioFormat.compactKg(session.totalVolume))\(session.durationMinutes.map { " · \(Int($0)) 分钟" } ?? "")\(session.effortScore.map { " · 强度 \($0)/10" } ?? "")")
                         .font(SetmioTokens.Typography.footnote)
                         .foregroundStyle(.secondary)
+                    if session.hkWorkoutUUID != nil {
+                        Label("已写入「健康」", systemImage: "heart.text.square")
+                            .font(SetmioTokens.Typography.caption)
+                            .foregroundStyle(SetmioTokens.Colors.positive)
+                    }
                 }
             }
         }

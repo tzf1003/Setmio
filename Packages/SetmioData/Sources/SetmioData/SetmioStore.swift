@@ -13,6 +13,21 @@ public enum ReconcileOutcome: Sendable, Equatable, Hashable {
     case alreadyKnown
 }
 
+/// Row counts of the tables the Settings screen shows. A re-import that leaves them unchanged has not duplicated anything.
+public struct LocalRowCounts: Sendable, Equatable {
+    public var bodyMeasurements: Int
+    public var importedWorkouts: Int
+    public var dailyMetricDays: Int
+    public var loggedSessions: Int
+
+    public init(bodyMeasurements: Int, importedWorkouts: Int, dailyMetricDays: Int, loggedSessions: Int) {
+        self.bodyMeasurements = bodyMeasurements
+        self.importedWorkouts = importedWorkouts
+        self.dailyMetricDays = dailyMetricDays
+        self.loggedSessions = loggedSessions
+    }
+}
+
 #if canImport(SwiftData)
 import SwiftData
 
@@ -405,6 +420,16 @@ public actor SetmioStore { // @ModelActor generates a public init(modelContainer
     }
 
     /// Ascending by date, inclusive bounds.
+    /// Row counts for the Settings screen. `fetchCount` does not materialise the rows.
+    public func rowCounts() throws -> LocalRowCounts {
+        LocalRowCounts(
+            bodyMeasurements: try modelContext.fetchCount(FetchDescriptor<BodyMeasurementEntity>()),
+            importedWorkouts: try modelContext.fetchCount(FetchDescriptor<ImportedWorkoutEntity>()),
+            dailyMetricDays: try modelContext.fetchCount(FetchDescriptor<DailyMetricsEntity>()),
+            loggedSessions: try modelContext.fetchCount(FetchDescriptor<LoggedSessionEntity>())
+        )
+    }
+
     public func bodyMeasurements(from start: Date, to end: Date) throws -> [BodyMeasurement] {
         let rows = try fetchAll(
             BodyMeasurementEntity.self,

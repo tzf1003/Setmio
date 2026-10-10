@@ -15,6 +15,17 @@ struct StartSessionView: View {
     var body: some View {
         NavigationStack {
             List {
+                if let pending = env.unfinishedSession {
+                    Section {
+                        Text("上次的训练没有结束，已记 \(pending.sets.count) 组。")
+                            .font(.footnote)
+                        Button("继续训练") { resume() }
+                            .buttonStyle(.setmioPrimary)
+                            .disabled(isStarting)
+                    } header: {
+                        Text("未结束的训练")
+                    }
+                }
                 Section(env.plan.dayNameZH == WatchEnvironment.freeTrainingName ? "没有今日计划" : "今日计划") {
                     if env.plan.exercises.isEmpty {
                         Text("在 iPhone 上开始一个训练周期后，计划会同步到这里。")
@@ -56,6 +67,14 @@ struct StartSessionView: View {
             }
             .navigationTitle("Setmio")
             .task { await requestAuthorizationIfNeeded() }
+        }
+    }
+
+    private func resume() {
+        isStarting = true
+        Task {
+            await env.resumeUnfinishedSession()
+            isStarting = false
         }
     }
 

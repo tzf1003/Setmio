@@ -85,6 +85,24 @@ final class AppEnvironment {
     private(set) var todayPlan: PlannedSession?
     private(set) var lastError: String?
 
+    /// Whether an Apple Watch workout is mirrored to this phone right now (always false without HealthKit).
+    var isWatchMirroring: Bool {
+        #if canImport(HealthKit)
+        mirroringHost.isWatchMirroring
+        #else
+        false
+        #endif
+    }
+
+    /// Sets received from the watch since the current mirroring connection began.
+    var watchSetsReceived: Int {
+        #if canImport(HealthKit)
+        mirroringHost.setsReceived
+        #else
+        0
+        #endif
+    }
+
     var calendar: Calendar { settings.calendar }
     var today: DayKey { DayKey(Date(), calendar: calendar) }
 

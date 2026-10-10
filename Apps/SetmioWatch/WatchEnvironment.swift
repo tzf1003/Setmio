@@ -49,6 +49,9 @@ final class WatchEnvironment {
     private(set) var restTimer: RestTimer?
     private(set) var unackedCount = 0
     private(set) var lastError: String?
+    /// A session the journal shows as started but never ended, when no HealthKit workout carries it (the app was
+    /// killed and the workout ended with it). Offered on the start screen; see `resumeUnfinishedSession`.
+    private(set) var unfinishedSession: RecoveredSession?
 
     private var sequencer = MirroringSequencer()
     private var restTask: Task<Void, Never>?
@@ -79,9 +82,50 @@ final class WatchEnvironment {
             await restoreActiveSession()
         }
         #endif
+        if activeSession == nil {
+            await loadUnfinishedSession()
+        }
         connectivity.activate()
         await haptics.requestNotificationAuthorization()
         await replayJournal()
+    }
+
+    /// Reads the journal for a started-but-unended session. A session that workout recovery already restored is
+    /// the active one, so nothing is offered in that case.
+    private func loadUnfinishedSession() async {
+        let messages = (try? await journal.allMessages()) ?? []
+        unfinishedSession = SessionRecovery.unfinishedSession(from: messages)
+    }
+
+    /// Continues `unfinishedSession` under its original id: the logged sets stay, and a new HealthKit workout covers
+    /// the rest. The interrupted workout is whatever HealthKit saved when the process ended.
+    func resumeUnfinishedSession() async {
+        guard !isSessionActive, let recovered = unfinishedSession else { return }
+        unfinishedSession = nil
+        var session = LoggedSession(
+            id: recovered.sessionID,
+            plannedSessionID: plan.id,
+            start: recovered.sets.first?.completedAt ?? Date(),
+            origin: .watch
+        )
+        session.sets = recovered.sets
+        adopt(session)
+        #if canImport(HealthKit)
+        do {
+            try await sessionManager.start(plan: plan, planVersion: planVersion)
+        } catch {
+            lastError = "无法继续训练：\(error.localizedDescription)"
+        }
+        #endif
+    }
+
+    /// Makes `session` the active one and points the plan at the first exercise that still has sets to do.
+    private func adopt(_ session: LoggedSession) {
+        activeSession = session
+        selectedExerciseID = nil
+        currentExerciseIndex = plan.exercises.firstIndex { planned in
+            session.sets.filter { $0.exerciseID == planned.exerciseID }.count < planned.sets.count
+        } ?? plan.exercises.count
     }
 
     #if canImport(HealthKit)
@@ -97,11 +141,7 @@ final class WatchEnvironment {
             origin: .watch
         )
         session.sets = recovered?.sets ?? []
-        activeSession = session
-        selectedExerciseID = nil
-        currentExerciseIndex = plan.exercises.firstIndex { planned in
-            session.sets.filter { $0.exerciseID == planned.exerciseID }.count < planned.sets.count
-        } ?? plan.exercises.count
+        adopt(session)
     }
     #endif
 

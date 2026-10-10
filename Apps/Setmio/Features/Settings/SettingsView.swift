@@ -1,5 +1,6 @@
 import SwiftUI
 import SetmioCore
+import SetmioData
 import SetmioHealth
 import SetmioAI
 import SetmioUI
@@ -31,6 +32,8 @@ struct SettingsView: View {
     @State private var goalWeight: Double = 70
     @State private var proteinChoice: ProteinStandardChoice = .usAdvisory
     @State private var glp1Mode = false
+    /// Row counts of the local tables, refreshed after every sync (shown in the 数据 section).
+    @State private var rowCounts: LocalRowCounts?
 
     var body: some View {
         NavigationStack {
@@ -43,6 +46,9 @@ struct SettingsView: View {
             }
             .navigationTitle("设置")
             .task { await loadState() }
+            .onChange(of: env.syncService.isSyncing) { _, syncing in
+                if !syncing { Task { await refreshRowCounts() } }
+            }
         }
     }
 
@@ -84,6 +90,9 @@ struct SettingsView: View {
                     Text("导入 \(progress.kind.nameZH)（\(progress.kindIndex + 1)/\(progress.kindCount)）· \(progress.importedSoFar) 条")
                         .font(SetmioTokens.Typography.footnote)
                 }
+            }
+            if let counts = rowCounts {
+                LabeledContent("本地记录", value: "体重 \(counts.bodyMeasurements) · 导入训练 \(counts.importedWorkouts) · 每日指标 \(counts.dailyMetricDays) 天")
             }
             if let report = env.syncService.lastReport {
                 LabeledContent("上次导入", value: "\(report.totalImported) 条 · \(report.succeeded ? "成功" : "\(report.failedKinds.count) 类失败")")
@@ -178,7 +187,12 @@ struct SettingsView: View {
             glp1Mode = profile.glp1Mode
         }
         isProfileLoaded = true
+        await refreshRowCounts()
         await refreshAuthorization()
+    }
+
+    private func refreshRowCounts() async {
+        rowCounts = try? await env.store.rowCounts()
     }
 
     private func refreshAuthorization() async {

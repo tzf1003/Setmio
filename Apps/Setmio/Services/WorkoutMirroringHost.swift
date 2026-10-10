@@ -25,6 +25,8 @@ final class WorkoutMirroringHost {
     private(set) var lastMessageAt: Date?
     private(set) var lastError: String?
     private(set) var setsReceived = 0
+    /// True while a watch workout is mirrored to this phone (set on attach, cleared when the session closes).
+    private(set) var isWatchMirroring = false
 
     private let receiver: MirroringSessionReceiver
     private let store: SetmioStore
@@ -36,7 +38,12 @@ final class WorkoutMirroringHost {
         self.receiver = receiver
         self.store = store
         self.activity = activity
+        receiver.onAttach = { [weak self] _ in
+            self?.isWatchMirroring = true
+            self?.setsReceived = 0
+        }
         receiver.onSessionClosed = { [weak self] _ in
+            self?.isWatchMirroring = false
             Task { await self?.remoteSessionClosed() }
         }
     }
