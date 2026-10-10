@@ -147,7 +147,10 @@ struct TrainingView: View {
                 Button("结束训练", role: .destructive) { showEndSheet = true }
             } else {
                 Button("开始手机记录") {
-                    phoneSession = LoggedSession(plannedSessionID: env.todayPlan?.id, start: Date(), origin: .phone)
+                    let started = LoggedSession(plannedSessionID: env.todayPlan?.id, start: Date(), origin: .phone)
+                    phoneSession = started
+                    // Persist right away so the session survives the app being killed mid-workout (restored in `load`).
+                    Task { try? await env.store.upsertLoggedSession(started) }
                 }
             }
         }
@@ -158,7 +161,7 @@ struct TrainingView: View {
             if sessions.isEmpty {
                 Text("还没有训练记录。").foregroundStyle(.secondary)
             }
-            ForEach(sessions) { session in
+            ForEach(sessions.filter { $0.id != phoneSession?.id }) { session in
                 VStack(alignment: .leading, spacing: SetmioTokens.Spacing.xxs) {
                     HStack {
                         Text(SetmioFormat.date(session.start, calendar: env.calendar))
@@ -183,6 +186,9 @@ struct TrainingView: View {
             mesocycle = try await env.store.activeMesocycle()
             exercises = try await env.store.exercises()
             sessions = try await env.store.loggedSessions(limit: 30)
+            if phoneSession == nil {
+                phoneSession = sessions.first { $0.origin == .phone && $0.end == nil }
+            }
             error = nil
         } catch {
             self.error = "加载失败：\(error.localizedDescription)"
@@ -213,29 +219,60 @@ struct TrainingView: View {
         }
     }
 
+    /// Saves the finished session locally first so the UI never waits on HealthKit, then writes the workout to
+    /// 「健康」 in the background (with a timeout) and links `hkWorkoutUUID` when that succeeds.
     private func endPhoneSession(effort: Int?) async {
         guard var session = phoneSession else { return }
         session.end = Date()
         session.effortScore = effort
         session.revision += 1
-        #if canImport(HealthKit)
-        if HKHealthStore.isHealthDataAvailable(), !session.sets.isEmpty {
-            do {
-                let workout = try await WorkoutWriter(store: env.healthStore).writePhoneOnlyWorkout(session: session)
-                session.hkWorkoutUUID = workout.uuid
-            } catch {
-                self.error = "已保存本地记录，但写入「健康」失败：\(error.localizedDescription)"
-            }
-        }
-        #endif
         do {
             try await env.store.upsertLoggedSession(session, replacingSets: true)
         } catch {
             self.error = "保存失败：\(error.localizedDescription)"
+            return
         }
         phoneSession = nil
         await env.refreshTodayPlan()
         await load()
+
+        #if canImport(HealthKit)
+        if HKHealthStore.isHealthDataAvailable(), !session.sets.isEmpty {
+            let healthStore = env.healthStore
+            let finished = session
+            Task { [env] in
+                do {
+                    let uuid = try await Self.withTimeout(seconds: 30) {
+                        try await WorkoutWriter(store: healthStore).writePhoneOnlyWorkout(session: finished).uuid
+                    }
+                    var linked = finished
+                    linked.hkWorkoutUUID = uuid
+                    linked.revision += 1
+                    try await env.store.upsertLoggedSession(linked)
+                    await load()
+                } catch {
+                    self.error = "已保存本地记录，但写入「健康」失败：\(error.localizedDescription)"
+                }
+            }
+        }
+        #endif
+    }
+
+    private struct TimedOut: Error, LocalizedError {
+        var errorDescription: String? { "请求超时，请检查「健康」授权" }
+    }
+
+    /// Runs `work`, throwing `TimedOut` if it has not finished after `seconds`.
+    private static func withTimeout<T: Sendable>(seconds: Double, _ work: @escaping @Sendable () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await work() }
+            group.addTask {
+                try await Task.sleep(for: .seconds(seconds))
+                throw TimedOut()
+            }
+            defer { group.cancelAll() }
+            return try await group.next()!
+        }
     }
 }
 
