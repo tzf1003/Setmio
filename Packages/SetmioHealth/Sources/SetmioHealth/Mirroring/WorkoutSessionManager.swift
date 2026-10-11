@@ -2,7 +2,11 @@
 import Foundation
 import HealthKit
 import Observation
+import os
 import SetmioCore
+
+/// Heart-rate and builder diagnostics (subsystem com.tzf1003.setmio, category hr). Read in Console.app or `log stream`.
+private let heartRateLog = Logger(subsystem: "com.tzf1003.setmio", category: "hr")
 
 /// Drives the watch workout session, the live builder and the mirroring channel to the iPhone.
 ///
@@ -31,6 +35,17 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
     public var onRemoteMessage: (@MainActor (MirroringMessage) -> Void)?
     /// Called with a short Chinese description when a non-fatal send fails (the watch app falls back to WatchConnectivity).
     public var onSendFailure: (@MainActor (String) -> Void)?
+
+    // MARK: Heart-rate diagnostics (read by the temporary readout in ActiveSessionView; reset by `start(plan:)`)
+
+    /// Builder callbacks that carried a heart-rate sample since the start.
+    public private(set) var heartRateDeliveries = 0
+    /// Most recent HealthKit or mirroring error since the start, as "步骤：说明".
+    public private(set) var lastErrorText: String?
+    /// Write (share) status for heart rate. HealthKit does not report read status: a denied read looks like no data.
+    public var heartRateShareStatus: HKAuthorizationStatus {
+        store.authorizationStatus(for: HKQuantityType(.heartRate))
+    }
 
     @ObservationIgnored private let store: HKHealthStore
     @ObservationIgnored private let appVersion: String
@@ -61,6 +76,8 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         guard !isActive else { return }
         self.plan = plan
         state = .preparing
+        heartRateDeliveries = 0
+        lastErrorText = nil
 
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = .traditionalStrengthTraining
@@ -68,7 +85,9 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
 
         let session = try HKWorkoutSession(healthStore: store, configuration: configuration)
         let builder = session.associatedWorkoutBuilder()
-        builder.dataSource = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: configuration)
+        let dataSource = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: configuration)
+        builder.dataSource = dataSource
+        heartRateLog.info("start: HR write status \(self.heartRateShareStatus.rawValue, privacy: .public), HR in typesToCollect \(dataSource.typesToCollect.contains(HKQuantityType(.heartRate)), privacy: .public)")
         session.delegate = self
         builder.delegate = self
         self.session = session
@@ -80,12 +99,13 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         } catch {
             // Mirroring is best-effort: the session still records on the watch and WatchConnectivity takes over.
             mirroringConnected = false
+            recordError("startMirroringToCompanionDevice", error.localizedDescription)
             onSendFailure?("无法镜像到 iPhone：\(error.localizedDescription)")
         }
 
         let startDate = Date()
         session.startActivity(with: startDate)
-        try await builder.beginCollection(at: startDate)
+        try await tracked("beginCollection") { try await builder.beginCollection(at: startDate) }
         startElapsedTicker()
 
         if mirroringConnected {
@@ -111,11 +131,11 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         state = .ending
         stopElapsedTicker()
         session.end()
-        try await builder.endCollection(at: Date())
+        try await tracked("endCollection") { try await builder.endCollection(at: Date()) }
         if !metadata.isEmpty {
             try await builder.addMetadata(metadata)
         }
-        let workout: HKWorkout? = try await builder.finishWorkout()
+        let workout: HKWorkout? = try await tracked("finishWorkout") { try await builder.finishWorkout() }
         if let workout, let effort {
             try await WorkoutWriter(store: store).writeEffort(effort, for: workout)
         }
@@ -147,6 +167,7 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
                 mirroringConnected = false
             }
         } catch {
+            recordError("recoverActiveWorkoutSession", error.localizedDescription)
             state = .failed(error.localizedDescription)
         }
     }
@@ -176,6 +197,7 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         Task { @MainActor in
             self.stopElapsedTicker()
             self.state = .failed(message)
+            self.recordError("HKWorkoutSession", message)
         }
     }
 
@@ -189,7 +211,11 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
     }
 
     nonisolated public func workoutSession(_ workoutSession: HKWorkoutSession, didDisconnectFromRemoteDeviceWithError error: (any Error)?) {
-        Task { @MainActor in self.mirroringConnected = false }
+        let message = error?.localizedDescription
+        Task { @MainActor in
+            self.mirroringConnected = false
+            if let message { self.recordError("mirroring disconnect", message) }
+        }
     }
 
     // MARK: HKLiveWorkoutBuilderDelegate
@@ -198,12 +224,35 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         let heartRateType = HKQuantityType(.heartRate)
         guard collectedTypes.contains(heartRateType) else { return }
         let bpm = workoutBuilder.statistics(for: heartRateType)?.mostRecentQuantity()?.doubleValue(for: HealthTypes.heartRateUnit)
-        Task { @MainActor in self.heartRate = bpm }
+        Task { @MainActor in
+            self.heartRate = bpm
+            self.heartRateDeliveries += 1
+            if let bpm {
+                heartRateLog.info("HR sample #\(self.heartRateDeliveries, privacy: .public): \(bpm, privacy: .private) bpm")
+            } else {
+                heartRateLog.error("HR collected but builder returned no most-recent quantity (callback #\(self.heartRateDeliveries, privacy: .public))")
+            }
+        }
     }
 
     nonisolated public func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}
 
     // MARK: Private
+
+    private func recordError(_ step: String, _ message: String) {
+        lastErrorText = "\(step)：\(message)"
+        heartRateLog.error("\(step, privacy: .public) error: \(message, privacy: .public)")
+    }
+
+    /// Runs one builder or session step, records its error for the diagnostics readout, then rethrows.
+    private func tracked<T>(_ step: String, _ operation: () async throws -> T) async throws -> T {
+        do {
+            return try await operation()
+        } catch {
+            recordError(step, error.localizedDescription)
+            throw error
+        }
+    }
 
     private func apply(sessionState: HKWorkoutSessionState) {
         switch sessionState {
