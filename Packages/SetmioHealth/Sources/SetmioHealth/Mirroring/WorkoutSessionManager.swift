@@ -153,6 +153,9 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
             let recovered: HKWorkoutSession? = try await store.recoverActiveWorkoutSession()
             guard let session = recovered else { return }
             let builder = session.associatedWorkoutBuilder()
+            // start(plan:) attaches a live data source; the recovered builder needs one too, or nothing is collected
+            // automatically (HKLiveWorkoutDataSource.h: "to be used with an HKWorkoutBuilder to automatically collect samples").
+            builder.dataSource = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: session.workoutConfiguration)
             session.delegate = self
             builder.delegate = self
             self.session = session
