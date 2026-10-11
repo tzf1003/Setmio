@@ -125,6 +125,9 @@ targets:
   SetmioTests:
     type: bundle.unit-test
     platform: iOS
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
     sources:
       - Tests/SetmioTests
     dependencies:
@@ -159,6 +162,9 @@ targets:
       - Tests/SetmioUITests
     dependencies:
       - target: Setmio
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
 
 schemes:
   # Simulator walk-through of onboarding + demo data (make test-app-ui). Kept out of the Setmio scheme so CI stays fast.

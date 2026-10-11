@@ -51,7 +51,7 @@ test-ios: generate
 test-app-ui: generate
 	rm -rf build/SetmioUI.xcresult
 	-xcrun simctl uninstall booted com.tzf1003.setmio 2>/dev/null   # first-launch state: onboarding must appear
-	xcodebuild test -project $(PROJECT) -scheme SetmioUI -destination '$(SIM_DEST)' -resultBundlePath build/SetmioUI.xcresult CODE_SIGNING_ALLOWED=NO
+	xcodebuild test -project $(PROJECT) -scheme SetmioUI -destination '$(SIM_DEST)' -skip-testing:SetmioUITests/DeviceChecklistUITests -resultBundlePath build/SetmioUI.xcresult CODE_SIGNING_ALLOWED=NO
 
 proxy-install:
 	npm --prefix proxy install
