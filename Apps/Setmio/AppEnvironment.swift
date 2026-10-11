@@ -103,6 +103,15 @@ final class AppEnvironment {
         #endif
     }
 
+    /// Bumped after each watch-originated store write; the Training tab reloads when it changes.
+    var watchEventCount: Int {
+        #if canImport(HealthKit)
+        mirroringHost.watchEventCount
+        #else
+        0
+        #endif
+    }
+
     var calendar: Calendar { settings.calendar }
     var today: DayKey { DayKey(Date(), calendar: calendar) }
 

@@ -25,6 +25,8 @@ final class WorkoutMirroringHost {
     private(set) var lastMessageAt: Date?
     private(set) var lastError: String?
     private(set) var setsReceived = 0
+    /// Bumped right after each watch-originated store write (setLogged, setDeleted, sessionEnded), so views reload.
+    private(set) var watchEventCount = 0
     /// True while a watch workout is mirrored to this phone (set on attach, cleared when the session closes).
     private(set) var isWatchMirroring = false
 
@@ -74,6 +76,7 @@ final class WorkoutMirroringHost {
 
             case .setLogged(let set, let restSeconds):
                 try await store.upsertLoggedSets([set], into: set.sessionID)
+                watchEventCount += 1
                 activeSessionID = set.sessionID
                 setsReceived += 1
                 try await reply(.ack(ids: [set.id.rawValue]), via: channel)
@@ -81,11 +84,13 @@ final class WorkoutMirroringHost {
 
             case .setDeleted(let id):
                 try await store.deleteLoggedSets(ids: [id])
+                watchEventCount += 1
                 try await reply(.ack(ids: [id.rawValue]), via: channel)
 
             case .sessionEnded(let session):
                 // Default merge keeps sets the phone already has; the revision guard ignores stale re-sends.
                 try await store.upsertLoggedSession(session)
+                watchEventCount += 1
                 try await reply(.ack(ids: [session.id.rawValue] + session.sets.map(\.id.rawValue)), via: channel)
                 await activity.end()
                 activeSessionID = nil

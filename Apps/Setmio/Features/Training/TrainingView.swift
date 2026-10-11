@@ -41,6 +41,7 @@ struct TrainingView: View {
             .refreshable { await load() }
             .onChange(of: env.isWatchMirroring) { _, _ in Task { await load() } }
             .onChange(of: env.watchSetsReceived) { _, _ in Task { await load() } }
+            .onChange(of: env.watchEventCount) { _, _ in Task { await load() } }
             .sheet(isPresented: $showLogSheet) {
                 if let session = phoneSession {
                     LogSetSheet(exercises: exercises, nextIndex: session.sets.count, plan: env.todayPlan) { set in
