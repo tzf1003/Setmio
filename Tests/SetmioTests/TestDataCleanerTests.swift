@@ -24,6 +24,8 @@ actor FakeWorkoutDeleter: HealthWorkoutDeleting {
 struct TestDataCleanerTests {
     private let calendar = Calendar.setmioDefault
     private let day = DayKey(year: 2026, month: 10, day: 5)
+    /// Every test set uses this exercise, so `recentSets` shows which sets survived a deletion.
+    private let exerciseID = ID<Exercise>()
 
     private struct Fixture {
         let store: SetmioStore
@@ -68,7 +70,7 @@ struct TestDataCleanerTests {
             origin: origin
         )
         session.sets = (0..<setCount).map { index in
-            LoggedSet(sessionID: session.id, exerciseID: ID<Exercise>(), index: index, load: 40, reps: 8, rir: 2,
+            LoggedSet(sessionID: session.id, exerciseID: exerciseID, index: index, load: 40, reps: 8, rir: 2,
                       completedAt: start.addingTimeInterval(Double(index) * 200))
         }
         try await f.store.upsertLoggedSession(session)
@@ -93,6 +95,10 @@ struct TestDataCleanerTests {
         #expect(try await f.store.loggedSession(id: taggedB.id) == nil)
         let kept = try #require(try await f.store.loggedSession(id: untagged.id))
         #expect(kept.sets.count == 3)
+        // The tagged sessions' sets cascaded away: only the untagged session's three sets remain for the exercise.
+        let remainingSets = try await f.store.recentSets(exerciseID: exerciseID, limit: 100)
+        #expect(Set(remainingSets.map(\.sessionID)) == [untagged.id])
+        #expect(remainingSets.count == 3)
     }
 
     @Test("「健康」只收到被删除的标记训练中、由 Setmio 写入的 HKWorkout")
