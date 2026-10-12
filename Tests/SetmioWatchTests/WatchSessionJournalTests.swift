@@ -63,6 +63,38 @@ struct WatchSessionJournalTests {
         #expect(!FileManager.default.fileExists(atPath: reopened.fileURL.path))
     }
 
+    @Test("放弃训练的条目以会话 id 确认")
+    func discardIsAckedBySessionID() throws {
+        let sessionID = SetmioCore.ID<LoggedSession>()
+        #expect(WatchSessionJournal.journalID(for: .sessionDiscarded(sessionID)) == sessionID.rawValue)
+    }
+
+    @Test("放弃训练：只取代该会话的组，发送的放弃被确认后清空，其他会话的组保留")
+    func discardSupersedesOnlyItsOwnSets() async throws {
+        let directory = try makeDirectory()
+        let journal = WatchSessionJournal(directory: directory)
+        let abandoned = SetmioCore.ID<LoggedSession>()
+        let other = SetmioCore.ID<LoggedSession>()
+        let abandonedSet = sampleSet(sessionID: abandoned, index: 0)
+        let otherSet = sampleSet(sessionID: other, index: 0)
+        try await journal.append(MirroringEnvelope(seq: 1, message: .setLogged(abandonedSet, restSeconds: 90)))
+        try await journal.append(MirroringEnvelope(seq: 2, message: .setLogged(otherSet, restSeconds: 90)))
+
+        // The app's order: supersede the abandoned sets, then journal and send the discard.
+        try await journal.supersedeSetEntries(of: abandoned)
+        let discard = try await journal.append(MirroringEnvelope(seq: 3, message: .sessionDiscarded(abandoned)))
+        #expect(discard.id == abandoned.rawValue)
+        #expect(try await journal.replay().map(\.id) == [otherSet.id.rawValue, abandoned.rawValue])
+
+        // Recovery never offers the abandoned session, even while its discard is still unacked.
+        #expect(SessionRecovery.unfinishedSession(from: try await journal.allMessages())?.sessionID == other)
+
+        try await journal.markAcked(ids: [abandoned.rawValue])
+        try await journal.purgeAcked()
+        #expect(try await journal.replay().map(\.id) == [otherSet.id.rawValue])
+        #expect(try await journal.allMessages() == [.setLogged(otherSet, restSeconds: 90)])
+    }
+
     @Test("损坏的行被跳过，其余条目仍可回放")
     func corruptLinesAreSkipped() async throws {
         let directory = try makeDirectory()

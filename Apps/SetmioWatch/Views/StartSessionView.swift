@@ -11,6 +11,7 @@ struct StartSessionView: View {
     @Environment(WatchEnvironment.self) private var env
     @State private var isStarting = false
     @State private var authorizationRequested = false
+    @State private var confirmingDiscard = false
 
     var body: some View {
         NavigationStack {
@@ -21,6 +22,8 @@ struct StartSessionView: View {
                             .font(.footnote)
                         Button("继续训练") { resume() }
                             .buttonStyle(.setmioPrimary)
+                            .disabled(isStarting)
+                        Button("放弃", role: .destructive) { confirmingDiscard = true }
                             .disabled(isStarting)
                     } header: {
                         Text("未结束的训练")
@@ -67,6 +70,12 @@ struct StartSessionView: View {
             }
             .navigationTitle("Setmio")
             .task { await requestAuthorizationIfNeeded() }
+            .confirmationDialog("放弃这次训练？", isPresented: $confirmingDiscard, titleVisibility: .visible) {
+                Button("放弃", role: .destructive) { discardUnfinished() }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("已记的组和心率都不会保存，也无法恢复。")
+            }
         }
     }
 
@@ -74,6 +83,14 @@ struct StartSessionView: View {
         isStarting = true
         Task {
             await env.resumeUnfinishedSession()
+            isStarting = false
+        }
+    }
+
+    private func discardUnfinished() {
+        isStarting = true
+        Task {
+            await env.discardUnfinishedSession()
             isStarting = false
         }
     }

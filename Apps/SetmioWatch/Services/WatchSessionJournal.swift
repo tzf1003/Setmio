@@ -56,6 +56,7 @@ public actor WatchSessionJournal {
         case .setLogged(let set, _): set.id.rawValue
         case .setDeleted(let id): id.rawValue
         case .sessionEnded(let session): session.id.rawValue
+        case .sessionDiscarded(let id): id.rawValue
         case .hello, .ack, .planUpdated, .restTimerCommand, .restTimerChanged: nil
         }
     }
@@ -74,6 +75,19 @@ public actor WatchSessionJournal {
     public func markAcked(ids: [UUID]) throws {
         guard !ids.isEmpty else { return }
         try appendLine(Line(entry: nil, ack: ids))
+    }
+
+    /// Acks the unacked `setLogged` / `setDeleted` entries of one session. Called when the user abandons it: the
+    /// phone deletes the whole session on `sessionDiscarded`, and a set re-sent afterwards would make the phone
+    /// recreate the session (`upsertLoggedSets` builds a skeleton for an unknown id).
+    public func supersedeSetEntries(of sessionID: ID<LoggedSession>) throws {
+        let loggedSetIDs = Set(try allMessages().compactMap { message -> UUID? in
+            guard case .setLogged(let set, _) = message, set.sessionID == sessionID else { return nil }
+            return set.id.rawValue
+        })
+        // A `setDeleted` entry is keyed by the same set id, so it is covered too.
+        let pending = try replay().map(\.id).filter { loggedSetIDs.contains($0) }
+        try markAcked(ids: pending)
     }
 
     /// Rewrites the file keeping only unacked entries (call after the session's final ack).

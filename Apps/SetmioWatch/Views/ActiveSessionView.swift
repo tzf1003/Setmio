@@ -32,9 +32,10 @@ struct ActiveSessionView: View {
                 }
             }
             .sheet(isPresented: $showEndSheet) {
-                EffortRatingSheet { effort in
-                    await env.endSession(effort: effort)
-                }
+                EffortRatingSheet(
+                    onEnd: { effort in await env.endSession(effort: effort) },
+                    onDiscard: { await env.discardSession() }
+                )
             }
             .overlay {
                 if env.restTimer != nil {
@@ -176,10 +177,12 @@ private struct ExercisePickerView: View {
 
 private struct EffortRatingSheet: View {
     let onEnd: (Int?) async -> Void
+    let onDiscard: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var effort = 6
     @State private var isEnding = false
+    @State private var confirmingDiscard = false
 
     var body: some View {
         VStack(spacing: SetmioTokens.Spacing.sm) {
@@ -200,8 +203,17 @@ private struct EffortRatingSheet: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
                 .disabled(isEnding)
+            Button("放弃训练(不保存)", role: .destructive) { confirmingDiscard = true }
+                .font(.footnote)
+                .disabled(isEnding)
         }
         .padding(.horizontal, SetmioTokens.Spacing.gutter)
+        .confirmationDialog("放弃这次训练？", isPresented: $confirmingDiscard, titleVisibility: .visible) {
+            Button("放弃", role: .destructive) { discard() }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("已记的组和心率都不会保存，也无法恢复。")
+        }
     }
 
     private var effortLabel: String {
@@ -217,6 +229,15 @@ private struct EffortRatingSheet: View {
         isEnding = true
         Task {
             await onEnd(value)
+            isEnding = false
+            dismiss()
+        }
+    }
+
+    private func discard() {
+        isEnding = true
+        Task {
+            await onDiscard()
             isEnding = false
             dismiss()
         }

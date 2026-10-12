@@ -269,6 +269,27 @@ final class WatchEnvironment {
         await journalAndSend(.sessionEnded(session))
     }
 
+    /// 放弃训练(不保存): discards the running workout in HealthKit (nothing is written) and tells the phone to delete
+    /// the session and its sets. The abandon is journaled, so it is re-sent until acked and the session is never offered again.
+    func discardSession() async {
+        skipRest()
+        let sessionID = activeSession?.id
+        #if canImport(HealthKit)
+        await sessionManager.discard()
+        #endif
+        activeSession = nil
+        if let sessionID {
+            await journalDiscard(of: sessionID)
+        }
+    }
+
+    /// 放弃 for the leftover session on the start screen (no HealthKit session is running for it).
+    func discardUnfinishedSession() async {
+        guard !isSessionActive, let recovered = unfinishedSession else { return }
+        unfinishedSession = nil
+        await journalDiscard(of: recovered.sessionID)
+    }
+
     // MARK: Rest timer
 
     func startRest(seconds: TimeInterval) {
@@ -359,6 +380,17 @@ final class WatchEnvironment {
         await deliver(envelope)
     }
 
+    /// Supersedes the abandoned session's set entries first (so no set is re-sent after the phone deletes the session),
+    /// then journals and sends the discard.
+    private func journalDiscard(of sessionID: SetmioCore.ID<LoggedSession>) async {
+        do {
+            try await journal.supersedeSetEntries(of: sessionID)
+        } catch {
+            lastError = "无法记录放弃：\(error.localizedDescription)"
+        }
+        await journalAndSend(.sessionDiscarded(sessionID))
+    }
+
     private func deliver(_ envelope: MirroringEnvelope) async {
         #if canImport(HealthKit)
         if sessionManager.mirroringConnected {
@@ -411,7 +443,7 @@ final class WatchEnvironment {
             case .resume: resumeRest()
             }
 
-        case .hello, .setLogged, .setDeleted, .sessionEnded, .restTimerChanged:
+        case .hello, .setLogged, .setDeleted, .sessionEnded, .sessionDiscarded, .restTimerChanged:
             break // watch → phone only
         }
     }
