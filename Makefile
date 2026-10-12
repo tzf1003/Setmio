@@ -2,7 +2,7 @@ XCODEGEN ?= xcodegen
 PROJECT   = Setmio.xcodeproj
 SIM_DEST ?= platform=iOS Simulator,name=iPhone 17
 
-.PHONY: test-app-ui help bootstrap generate test-core test-ai test-data test-health test-ui test-packages build-ios build-watch test-ios proxy-install proxy-dev proxy-test clean
+.PHONY: test-catalogue test-app-ui help bootstrap generate test-core test-ai test-data test-health test-ui test-packages build-ios build-watch test-ios proxy-install proxy-dev proxy-test clean
 
 help:
 	@echo "make bootstrap      - install xcodegen (brew), create Local.xcconfig, generate project, npm install proxy"
@@ -37,7 +37,10 @@ test-health:
 test-ui:
 	swift test --package-path Packages/SetmioUI
 
-test-packages: test-core test-ai test-data test-health test-ui
+test-catalogue:
+	swift test --package-path Packages/SetmioCatalogue
+
+test-packages: test-core test-ai test-data test-health test-ui test-catalogue
 
 build-ios: generate
 	xcodebuild -project $(PROJECT) -scheme Setmio -destination 'generic/platform=iOS' -configuration Debug build CODE_SIGNING_ALLOWED=NO

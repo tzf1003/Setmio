@@ -26,6 +26,8 @@ jobs:
         run: swift test --package-path Packages/SetmioData
       - name: SetmioUI (SwiftUI-free parts)
         run: swift test --package-path Packages/SetmioUI
+      - name: SetmioCatalogue (exercise library data)
+        run: swift test --package-path Packages/SetmioCatalogue
 
   proxy:
     runs-on: ubuntu-latest
