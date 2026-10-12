@@ -20,6 +20,8 @@ final class WorkoutMirroringHost {
     var todayPlan: @MainActor () async -> PlannedSession? = { nil }
     /// Sends an envelope over WatchConnectivity (set by `AppEnvironment`).
     var connectivityReply: (@MainActor (MirroringEnvelope) -> Void)?
+    /// Called after each watch-originated session write, so test-mode tagging can apply (set by `AppEnvironment`).
+    var onSessionReceived: (@MainActor (SetmioCore.ID<LoggedSession>) -> Void)?
 
     private(set) var activeSessionID: SetmioCore.ID<LoggedSession>?
     private(set) var lastMessageAt: Date?
@@ -76,6 +78,7 @@ final class WorkoutMirroringHost {
 
             case .setLogged(let set, let restSeconds):
                 try await store.upsertLoggedSets([set], into: set.sessionID)
+                onSessionReceived?(set.sessionID)
                 watchEventCount += 1
                 activeSessionID = set.sessionID
                 setsReceived += 1
@@ -90,6 +93,7 @@ final class WorkoutMirroringHost {
             case .sessionEnded(let session):
                 // Default merge keeps sets the phone already has; the revision guard ignores stale re-sends.
                 try await store.upsertLoggedSession(session)
+                onSessionReceived?(session.id)
                 watchEventCount += 1
                 try await reply(.ack(ids: [session.id.rawValue] + session.sets.map(\.id.rawValue)), via: channel)
                 await activity.end()

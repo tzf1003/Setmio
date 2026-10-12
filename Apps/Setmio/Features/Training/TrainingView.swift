@@ -19,6 +19,8 @@ struct TrainingView: View {
     @State private var showLogSheet = false
     @State private var showEndSheet = false
     @State private var error: String?
+    /// Sessions tagged as test data: shown with a badge, and the swipe action toggles the tag.
+    @State private var testSessionIDs: Set<SetmioCore.ID<LoggedSession>> = []
 
     private var exerciseNames: [SetmioCore.ID<Exercise>: String] {
         Dictionary(exercises.map { ($0.id, $0.nameZH) }, uniquingKeysWith: { first, _ in first })
@@ -43,6 +45,7 @@ struct TrainingView: View {
             .onChange(of: env.isWatchMirroring) { _, _ in Task { await load() } }
             .onChange(of: env.watchSetsReceived) { _, _ in Task { await load() } }
             .onChange(of: env.watchEventCount) { _, _ in Task { await load() } }
+            .onChange(of: env.testDataRevision) { _, _ in Task { await load() } }
             .sheet(isPresented: $showLogSheet) {
                 if let session = phoneSession {
                     LogSetSheet(exercises: exercises, nextIndex: session.sets.count, plan: env.todayPlan) { set in
@@ -183,7 +186,10 @@ struct TrainingView: View {
                     let started = LoggedSession(plannedSessionID: env.todayPlan?.id, start: Date(), origin: .phone)
                     phoneSession = started
                     // Persist right away so the session survives the app being killed mid-workout (restored in `load`).
-                    Task { try? await env.store.upsertLoggedSession(started) }
+                    Task {
+                        _ = try? await env.store.upsertLoggedSession(started)
+                        await env.tagIfTestMode(started.id)
+                    }
                 }
             }
         }
@@ -195,9 +201,17 @@ struct TrainingView: View {
                 Text("还没有训练记录。").foregroundStyle(.secondary)
             }
             ForEach(sessions.filter { $0.id != phoneSession?.id }) { session in
+                let isTest = testSessionIDs.contains(session.id)
                 VStack(alignment: .leading, spacing: SetmioTokens.Spacing.xxs) {
                     HStack {
                         Text(SetmioFormat.date(session.start, calendar: env.calendar))
+                        if isTest {
+                            Text("测试")
+                                .font(SetmioTokens.Typography.caption)
+                                .foregroundStyle(SetmioTokens.Colors.warning)
+                                .padding(.horizontal, SetmioTokens.Spacing.xs)
+                                .overlay(Capsule().stroke(SetmioTokens.Colors.warning, lineWidth: SetmioTokens.Stroke.hairline))
+                        }
                         Spacer()
                         Text(session.origin.nameZH)
                             .font(SetmioTokens.Typography.caption)
@@ -212,6 +226,12 @@ struct TrainingView: View {
                             .foregroundStyle(SetmioTokens.Colors.positive)
                     }
                 }
+                .swipeActions(edge: .trailing) {
+                    Button(isTest ? "取消标记" : "标记为测试") {
+                        Task { await toggleTest(session, isTest: isTest) }
+                    }
+                    .tint(SetmioTokens.Colors.warning)
+                }
             }
         }
     }
@@ -224,12 +244,29 @@ struct TrainingView: View {
             mesocycle = try await env.store.activeMesocycle()
             exercises = try await env.store.exercises()
             sessions = try await env.store.loggedSessions(limit: 30)
+            testSessionIDs = await env.testData.testSessionIDs()
             if phoneSession == nil {
                 phoneSession = sessions.first { $0.origin == .phone && $0.end == nil }
             }
             error = nil
         } catch {
             self.error = "加载失败：\(error.localizedDescription)"
+        }
+    }
+
+    /// Adds or removes the test-data tag. A plan already stored for a day is not rebuilt, so the tag only affects
+    /// plans built after this point.
+    private func toggleTest(_ session: LoggedSession, isTest: Bool) async {
+        do {
+            if isTest {
+                try await env.testData.unmark(session.id)
+            } else {
+                try await env.testData.mark(session.id)
+            }
+            await env.testDataDidChange()
+            await load()
+        } catch {
+            self.error = "无法更新测试标记：\(error.localizedDescription)"
         }
     }
 
@@ -270,6 +307,7 @@ struct TrainingView: View {
             self.error = "保存失败：\(error.localizedDescription)"
             return
         }
+        await env.tagIfTestMode(session.id)
         phoneSession = nil
         await env.refreshTodayPlan()
         await load()
