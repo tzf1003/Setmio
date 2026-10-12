@@ -48,16 +48,19 @@ npm install && npm run dev                   # 本地 Node 运行；wrangler dev
 
 ## 状态
 
-阶段 1 MVP：**代码与模拟器验收完成，等待真机清单**（[`docs/DEVICE_CHECKLIST.md`](docs/DEVICE_CHECKLIST.md)；通过后在 `docs/方案.md` §8 标记阶段 1 完成）。
+阶段 1 MVP：**代码完成，真机验收进行中**。逐项证据见 [`docs/DEVICE_LOG.md`](docs/DEVICE_LOG.md)，清单见 [`docs/DEVICE_CHECKLIST.md`](docs/DEVICE_CHECKLIST.md)；全部通过后才在 `docs/方案.md` §8 标记阶段 1 完成。
 
 | 检查 | 结果 |
 |---|---|
-| 包测试（Core 52 / AI 15 / Data 21 / Health 24 / UI 7） | 通过 |
-| Xcode：iOS 构建（含 watch App 与 Widget）、watchOS 构建 | BUILD SUCCEEDED |
-| iOS 模拟器宿主测试（含训练规划闭环） | TEST SUCCEEDED（5 个） |
-| 模拟器 UI 走查 `make test-app-ui`（引导 → 演示数据 → 准备度） | 通过 |
-| 真机：HealthKit / 手表训练 / Live Activity | 待验证 |
+| 包测试（Core 52 / AI 15 / Data 22 / Health 25 / UI 7 / Catalogue 38） | 通过 |
+| iOS 宿主测试（含训练规划闭环、数据新鲜度） | 通过（9 个） |
+| iOS / watchOS 构建 | 通过 |
+| CI（Linux 包测试、proxy、macOS 构建与测试） | 全绿 |
+| 真机（iPhone 17 Pro Max + Apple Watch Series 11） | 清单 1、2、3、8、9 通过；5 的手机部分、6（含心率）通过；7、10、4、休息震动 待复测 |
 
-已落地：首次启动引导（档案 → 健康授权 → 模板）、按计划预填的记组、60 天导入进度条、锁屏后台投递所需的文件保护、
-手表训练会话与镜像、崩溃恢复（日志回放）、休息计时暂停/继续与 Live Activity 按钮。
-`// VERIFY` 的处理结果见 [`docs/GOAL.md`](docs/GOAL.md) 末尾。
+已落地：首次启动引导、HealthKit 导入与进度、准备度评分、训练规划与手机记组、手表训练与镜像（崩溃恢复、日志回放）、休息计时与 Live Activity 按钮、打开 App 时过期数据后台刷新、**动作库**（5,632 个动作，按肌群在人体图上选择、按器械筛选）。
+
+已知限制：App 在后台/锁屏时 HealthKit 不可读、Live Activity 不能在后台启动（平台限制，已接受）；动作库不含动画（授权不允许）。
+
+### 许可
+动作库数据（`Packages/SetmioCatalogue`）来自 openGym，按 **AGPL-3.0** 提供，署名与来源见 `Packages/SetmioCatalogue/NOTICE.md`；人体图使用 MuscleMap（MIT）。仓库目前不公开；**对外分发前必须公开对应源码**（或另行提供），并确认「设置 → 开源许可」里的源码地址有效。
