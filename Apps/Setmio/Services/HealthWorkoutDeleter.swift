@@ -23,6 +23,9 @@ struct HealthKitWorkoutDeleter: HealthWorkoutDeleting {
         let foundIDs = Set(found.map(\.uuid))
 
         // The delete may succeed for some objects and fail for others; the re-read below counts what is left.
+        // VERIFY: on device, a phone-written workout should delete; a workout saved by the watch app is expected to be
+        // refused (different source). Confirm both, and that the read below returns our own workouts under the
+        // workout read permission. Remove this note once confirmed.
         _ = try? await store.delete(found)
 
         guard let remaining = try? await workouts(with: foundIDs) else {
