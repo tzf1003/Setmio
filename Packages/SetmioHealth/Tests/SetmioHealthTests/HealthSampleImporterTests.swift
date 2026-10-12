@@ -361,6 +361,7 @@ struct MirroringEnvelopeTests {
             .setLogged(loggedSet, restSeconds: 180),
             .setDeleted(loggedSet.id),
             .sessionEnded(session),
+            .sessionDiscarded(sessionID),
             .ack(ids: [loggedSet.id.rawValue, sessionID.rawValue]),
             .planUpdated(plan),
             .restTimerCommand(.add30),
@@ -565,5 +566,31 @@ struct SessionRecoveryTests {
             .setLogged(set(current, 0, minute: 120), restSeconds: 90),
         ]
         #expect(SessionRecovery.unfinishedSession(from: messages)?.sessionID == current)
+    }
+
+    @Test("放弃的训练不再恢复（即使它的组最新）")
+    func discardedIsNotRecovered() {
+        let abandoned = ID<LoggedSession>()
+        let messages: [MirroringMessage] = [
+            .setLogged(set(abandoned, 0, minute: 0), restSeconds: 90),
+            .setLogged(set(abandoned, 1, minute: 4), restSeconds: 90),
+            .sessionDiscarded(abandoned),
+        ]
+        #expect(SessionRecovery.unfinishedSession(from: messages) == nil)
+    }
+
+    @Test("放弃一个训练不挡住更早、未放弃的训练；放弃之后开始的训练照常恢复")
+    func discardDoesNotHideOtherSessions() {
+        let older = ID<LoggedSession>(), abandoned = ID<LoggedSession>(), newer = ID<LoggedSession>()
+        let beforeDiscard: [MirroringMessage] = [
+            .setLogged(set(older, 0, minute: 0), restSeconds: 90),
+            .setLogged(set(abandoned, 0, minute: 10), restSeconds: 90),
+            .sessionDiscarded(abandoned),
+        ]
+        // The abandoned session has the newest set, so only the exclusion keeps it from being chosen.
+        #expect(SessionRecovery.unfinishedSession(from: beforeDiscard)?.sessionID == older)
+
+        let afterDiscard = beforeDiscard + [.setLogged(set(newer, 0, minute: 120), restSeconds: 90)]
+        #expect(SessionRecovery.unfinishedSession(from: afterDiscard)?.sessionID == newer)
     }
 }

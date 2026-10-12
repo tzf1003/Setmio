@@ -20,6 +20,9 @@ public enum MirroringMessage: Codable, Sendable, Equatable {
     case setDeleted(ID<LoggedSet>)
     /// Watch → phone: the session finished (sets included for the final reconcile).
     case sessionEnded(LoggedSession)
+    /// Watch → phone: the user abandoned this session. Nothing was saved to HealthKit; the phone deletes the session
+    /// and its sets (they must not feed the progression plan) and acks the session id.
+    case sessionDiscarded(ID<LoggedSession>)
     /// Either direction: the receiver persisted these set/session ids.
     case ack(ids: [UUID])
     /// Phone → watch: today's plan changed (readiness modulation, edits).

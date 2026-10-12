@@ -17,7 +17,7 @@ public struct RecoveredSession: Sendable, Equatable {
 /// 「训练中强杀手表 App 可恢复」). Pure and Foundation-only so it is tested on Linux.
 public enum SessionRecovery {
     /// - Parameter messages: every journaled outbound message in append order, acked or not.
-    /// - Returns: the most recently active session that has no `.sessionEnded`, or nil when none is open.
+    /// - Returns: the most recently active session that has neither `.sessionEnded` nor `.sessionDiscarded`, or nil when none is open.
     public static func unfinishedSession(from messages: [MirroringMessage]) -> RecoveredSession? {
         var ended: Set<ID<LoggedSession>> = []
         var deleted: Set<ID<LoggedSet>> = []
@@ -33,6 +33,8 @@ public enum SessionRecovery {
                 deleted.insert(id)
             case .sessionEnded(let session):
                 ended.insert(session.id)
+            case .sessionDiscarded(let id):
+                ended.insert(id)   // an abandoned session is closed for good, like an ended one
             case .hello, .ack, .planUpdated, .restTimerCommand, .restTimerChanged:
                 break
             }

@@ -161,6 +161,28 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         return workout
     }
 
+    /// Abandons the session: ends it and discards the workout, so nothing is written to HealthKit. Works for a started
+    /// and a recovered session alike. Never throws; a HealthKit error is recorded for the diagnostics readout.
+    public func discard() async {
+        stopElapsedTicker()
+        guard let session, let builder else { return }
+        // Detach the delegates first: the end events of an abandoned session must not move `state` after we set it.
+        session.delegate = nil
+        builder.delegate = nil
+        state = .ending
+        session.end()
+        do {
+            try await builder.endCollection(at: Date())
+        } catch {
+            recordError("endCollection(discard)", error.localizedDescription)
+        }
+        builder.discardWorkout()
+        self.session = nil
+        self.builder = nil
+        mirroringConnected = false
+        state = .ended
+    }
+
     /// Re-attaches to a session HealthKit kept alive across a crash. Call once at watch app launch.
     public func recoverIfNeeded() async {
         guard !isActive else { return }
