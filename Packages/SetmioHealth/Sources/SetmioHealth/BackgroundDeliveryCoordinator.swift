@@ -15,6 +15,11 @@ public final class BackgroundDeliveryCoordinator: Sendable {
     private let importer: HealthSampleImporter
     private let onImported: @Sendable (HealthMetricKind) async -> Void
     private let tokens = Mutex<[HealthMetricKind: ObservationToken]>([:])
+    /// Kinds for which HealthKit accepted `enableBackgroundDelivery`. Only these count as enabled: a kind whose request
+    /// failed (typically because authorization had not been granted yet) is retried by the next `start`.
+    private let enabled = Mutex<Set<HealthMetricKind>>([])
+    /// Why the last `enableBackgroundDelivery` failed, per kind. Cleared for a kind when a later attempt succeeds.
+    private let failures = Mutex<[HealthMetricKind: String]>([:])
 
     public init(
         source: any HealthSampleSource,
@@ -38,21 +43,30 @@ public final class BackgroundDeliveryCoordinator: Sendable {
         }
     }
 
-    /// Enables background delivery and registers an observer for each kind. Kinds already observed are
-    /// skipped, so calling this again is harmless. Returns the kinds whose background delivery could not be
-    /// enabled (the observer is still registered for them so foreground updates keep working).
+    /// Enables background delivery and registers an observer for each kind. Calling this again is harmless: a kind
+    /// whose delivery is already enabled is skipped, and a kind whose request failed earlier is retried, because
+    /// the app calls `start` once before the user has granted access and again right after. The observer is
+    /// registered only once per kind and stays registered even when enabling failed, so foreground updates keep
+    /// working. Returns the kinds whose background delivery could not be enabled in this call.
     @discardableResult
     public func start(kinds: [HealthMetricKind] = HealthMetricKind.mvp) async -> [HealthMetricKind: String] {
-        var failures: [HealthMetricKind: String] = [:]
+        var failed: [HealthMetricKind: String] = [:]
         for kind in kinds {
-            let alreadyObserved = tokens.withLock { $0[kind] != nil }
-            if alreadyObserved { continue }
+            let deliveryEnabled = enabled.withLock { $0.contains(kind) }
+            let observed = tokens.withLock { $0[kind] != nil }
+            if deliveryEnabled && observed { continue }
 
-            do {
-                try await source.enableBackgroundDelivery(for: kind, frequency: Self.frequency(for: kind))
-            } catch {
-                failures[kind] = String(describing: error)
+            if !deliveryEnabled {
+                do {
+                    try await source.enableBackgroundDelivery(for: kind, frequency: Self.frequency(for: kind))
+                    enabled.withLock { _ = $0.insert(kind) }
+                    failures.withLock { _ = $0.removeValue(forKey: kind) }
+                } catch {
+                    failed[kind] = String(describing: error)
+                    failures.withLock { $0[kind] = String(describing: error) }
+                }
             }
+            if observed { continue }
 
             let importer = self.importer
             let onImported = self.onImported
@@ -65,7 +79,17 @@ public final class BackgroundDeliveryCoordinator: Sendable {
             }
             tokens.withLock { $0[kind] = token }
         }
-        return failures
+        return failed
+    }
+
+    /// Kinds for which HealthKit accepted background delivery (as opposed to merely having an observer).
+    public var deliveryEnabledKinds: [HealthMetricKind] {
+        enabled.withLock { Array($0) }.sorted { $0.rawValue < $1.rawValue }
+    }
+
+    /// The latest failure reason per kind whose background delivery is not enabled.
+    public var deliveryFailures: [HealthMetricKind: String] {
+        failures.withLock { $0 }
     }
 
     public var observedKinds: [HealthMetricKind] {

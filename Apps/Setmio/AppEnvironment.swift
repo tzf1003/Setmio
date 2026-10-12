@@ -44,6 +44,7 @@ final class AppEnvironment {
     private(set) var syncService: HealthSyncService
     /// Bound to the *real* source for the whole process lifetime (background wake-ups have no UI).
     let coordinator: BackgroundDeliveryCoordinator
+    @ObservationIgnored private let backgroundReporter: BackgroundUpdateReporter
     private let realSyncService: HealthSyncService
 
     var importer: HealthSampleImporter { syncService.importer }
@@ -84,6 +85,10 @@ final class AppEnvironment {
     private(set) var isBootstrapped = false
     private(set) var todayPlan: PlannedSession?
     private(set) var lastError: String?
+    /// When a HealthKit observer wake-up (background delivery) last finished updating the score in this process.
+    /// Written only by the background-delivery callback, so a foreground sync does not move it. The settings screen
+    /// shows it to tell "delivery never fired" from "fired but the UI did not refresh".
+    fileprivate(set) var lastBackgroundUpdateAt: Date?
 
     /// Whether an Apple Watch workout is mirrored to this phone right now (always false without HealthKit).
     var isWatchMirroring: Bool {
@@ -151,8 +156,12 @@ final class AppEnvironment {
         let realService = HealthSyncService(store: store, source: source, anchors: AnchorStore(), calculator: readinessCalculator)
         self.realSyncService = realService
         self.syncService = realService
+        // The callback runs before `self` exists, so it reports through a weak box that `init` points at `self` below.
+        let backgroundReport = BackgroundUpdateReporter()
+        self.backgroundReporter = backgroundReport
         self.coordinator = BackgroundDeliveryCoordinator(source: source, importer: realService.importer) { kind in
             await realService.recomputeAfterBackgroundImport(kind)
+            await backgroundReport.didUpdate()
         }
 
         self.planner = TrainingPlanner(store: store, engine: progressionEngine, modulator: readinessModulator)
@@ -162,6 +171,7 @@ final class AppEnvironment {
         self.mirroringHost = host
         #endif
 
+        backgroundReporter.environment = self
         wireWatchChannels()
         reconfigureProxy()
     }
@@ -335,5 +345,16 @@ final class AppEnvironment {
             self?.connectivityBridge.transfer(envelope)
         }
         #endif
+    }
+}
+
+/// Lets the background-delivery callback, which is created before `AppEnvironment` finishes `init`, tell the
+/// environment that an observer wake-up completed.
+@MainActor
+final class BackgroundUpdateReporter {
+    weak var environment: AppEnvironment?
+
+    func didUpdate() {
+        environment?.lastBackgroundUpdateAt = Date()
     }
 }

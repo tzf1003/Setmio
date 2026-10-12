@@ -292,6 +292,35 @@ struct BackgroundDeliveryCoordinatorTests {
         #expect(coordinator.observedKinds.isEmpty)
     }
 
+    @Test("a kind whose background delivery failed (not authorized yet) is retried by the next start, with one observer")
+    func failedDeliveryIsRetried() async throws {
+        struct NotAuthorized: Error {}
+        let source = FakeHealthSampleSource(samples: [:])
+        let importer = HealthSampleImporter(source: source, anchors: HealthFixture.anchors(), sink: RecordingSink())
+        let coordinator = BackgroundDeliveryCoordinator(source: source, importer: importer) { _ in }
+
+        // First launch, before the user granted access: HealthKit refuses background delivery.
+        source.failBackgroundDelivery(with: NotAuthorized())
+        let firstFailures = await coordinator.start(kinds: [.hrvSDNN, .sleep])
+        #expect(Set(firstFailures.keys) == [.hrvSDNN, .sleep])
+        #expect(coordinator.deliveryEnabledKinds.isEmpty)
+        #expect(Set(coordinator.deliveryFailures.keys) == [.hrvSDNN, .sleep])
+        #expect(source.observerCount(for: .hrvSDNN) == 1, "foreground updates still work")
+
+        // Right after granting access the app calls start again: this time it must actually enable delivery.
+        source.failBackgroundDelivery(with: nil)
+        let secondFailures = await coordinator.start(kinds: [.hrvSDNN, .sleep])
+        #expect(secondFailures.isEmpty)
+        #expect(coordinator.deliveryEnabledKinds == [.hrvSDNN, .sleep])
+        #expect(coordinator.deliveryFailures.isEmpty, "a successful retry clears the earlier failure")
+        #expect(source.observerCount(for: .hrvSDNN) == 1, "the observer is registered once, not once per start")
+        #expect(source.backgroundDeliveryRequests.count == 4, "two attempts per kind")
+
+        // A third call has nothing left to do.
+        await coordinator.start(kinds: [.hrvSDNN, .sleep])
+        #expect(source.backgroundDeliveryRequests.count == 4)
+    }
+
     @Test("frequency table matches the design: vitals immediate, activity hourly")
     func frequencies() {
         for kind in [HealthMetricKind.hrvSDNN, .hrvRMSSD, .restingHeartRate, .sleep, .respiratoryRate, .wristTemperature, .bodyMass] {

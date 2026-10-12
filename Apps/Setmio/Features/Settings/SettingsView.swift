@@ -101,6 +101,7 @@ struct SettingsView: View {
                 LabeledContent("上次同步", value: SetmioFormat.date(at, calendar: env.calendar) + " " + SetmioFormat.clock(at, calendar: env.calendar))
             }
             LabeledContent("手表 App", value: env.connectivityBridge.isWatchAppInstalled ? "已安装" : "未检测到")
+            backgroundDeliveryRows
         }
     }
 
@@ -190,6 +191,30 @@ struct SettingsView: View {
         isProfileLoaded = true
         await refreshRowCounts()
         await refreshAuthorization()
+    }
+
+    /// Whether HealthKit accepted background delivery. HealthKit data is unreadable while the phone is locked, so a
+    /// locked-screen update arrives after the next unlock at the earliest; this row tells which kinds are registered.
+    @ViewBuilder
+    private var backgroundDeliveryRows: some View {
+        #if canImport(HealthKit)
+        let enabled = env.coordinator.deliveryEnabledKinds
+        let failures = env.coordinator.deliveryFailures
+        LabeledContent("后台投递", value: "已启用 \(enabled.count) / \(HealthMetricKind.mvp.count) 项")
+        if !failures.isEmpty {
+            Text("未启用：" + failures.keys.sorted { $0.rawValue < $1.rawValue }.map(\.nameZH).joined(separator: "、"))
+                .font(SetmioTokens.Typography.footnote)
+                .foregroundStyle(SetmioTokens.Colors.negative)
+            if let reason = failures.values.sorted().first {
+                Text(reason).font(SetmioTokens.Typography.footnote).foregroundStyle(.secondary)
+            }
+        }
+        if let at = env.lastBackgroundUpdateAt {
+            LabeledContent("上次后台更新", value: SetmioFormat.date(at, calendar: env.calendar) + " " + SetmioFormat.clock(at, calendar: env.calendar))
+        } else {
+            LabeledContent("上次后台更新", value: "本次启动以来没有")
+        }
+        #endif
     }
 
     private func refreshRowCounts() async {

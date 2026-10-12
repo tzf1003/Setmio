@@ -61,6 +61,7 @@ public final class FakeHealthSampleSource: HealthSampleSource, @unchecked Sendab
     private var recordedAuthorizations: [AuthorizationRequest] = []
     private var recordedAnchoredRequests: [AnchoredRequest] = []
     private var recordedBackgroundDeliveries: [BackgroundDeliveryRequest] = []
+    private var backgroundDeliveryFailure: (any Error)?
     private var anchoredFailure: (any Error)?
 
     public init(samples: [HealthMetricKind: [HealthSample]] = [:], heartbeatSeries: [HeartbeatSeries] = [], workouts: [ImportedWorkout] = []) {
@@ -214,7 +215,16 @@ public final class FakeHealthSampleSource: HealthSampleSource, @unchecked Sendab
     }
 
     public func enableBackgroundDelivery(for kind: HealthMetricKind, frequency: BackgroundFrequency) async throws {
-        locked { recordedBackgroundDeliveries.append(BackgroundDeliveryRequest(kind: kind, frequency: frequency)) }
+        let failure: (any Error)? = locked {
+            recordedBackgroundDeliveries.append(BackgroundDeliveryRequest(kind: kind, frequency: frequency))
+            return backgroundDeliveryFailure
+        }
+        if let failure { throw failure }
+    }
+
+    /// Makes every following `enableBackgroundDelivery` throw (nil restores success). Models "not authorized yet".
+    public func failBackgroundDelivery(with error: (any Error)?) {
+        locked { backgroundDeliveryFailure = error }
     }
 
     public func observe(_ kind: HealthMetricKind, handler: @escaping ObserverHandler) -> ObservationToken {
