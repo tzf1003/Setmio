@@ -155,6 +155,17 @@ targets:
         product: SetmioHealthTesting
       - package: SetmioUI
 
+  SetmioWatchUITests:
+    type: bundle.ui-testing
+    platform: watchOS
+    sources:
+      - Tests/SetmioWatchUITests
+    dependencies:
+      - target: SetmioWatch
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
   SetmioUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -167,6 +178,15 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
 
 schemes:
+  # Drives the Apple Watch app on a real, paired watch (device checklist 6-9). Never runs in CI.
+  SetmioWatchUI:
+    build:
+      targets:
+        SetmioWatch: all
+    test:
+      config: Debug
+      targets:
+        - SetmioWatchUITests
   # Simulator walk-through of onboarding + demo data (make test-app-ui). Kept out of the Setmio scheme so CI stays fast.
   SetmioUI:
     build:

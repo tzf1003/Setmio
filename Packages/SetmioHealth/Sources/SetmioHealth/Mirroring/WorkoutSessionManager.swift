@@ -42,6 +42,9 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
     public private(set) var heartRateDeliveries = 0
     /// Most recent HealthKit or mirroring error since the start, as "步骤：说明".
     public private(set) var lastErrorText: String?
+    /// Whether the live data source the builder was given lists heart rate in `typesToCollect` (nil before the first start).
+    /// If this is false the builder never collects heart rate, whatever the sensor does.
+    public private(set) var heartRateInCollectedTypes: Bool?
     /// Write (share) status for heart rate. HealthKit does not report read status: a denied read looks like no data.
     public var heartRateShareStatus: HKAuthorizationStatus {
         store.authorizationStatus(for: HKQuantityType(.heartRate))
@@ -87,7 +90,8 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         let builder = session.associatedWorkoutBuilder()
         let dataSource = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: configuration)
         builder.dataSource = dataSource
-        heartRateLog.info("start: HR write status \(self.heartRateShareStatus.rawValue, privacy: .public), HR in typesToCollect \(dataSource.typesToCollect.contains(HKQuantityType(.heartRate)), privacy: .public)")
+        heartRateInCollectedTypes = dataSource.typesToCollect.contains(HKQuantityType(.heartRate))
+        heartRateLog.info("start: HR write status \(self.heartRateShareStatus.rawValue, privacy: .public), HR in typesToCollect \(self.heartRateInCollectedTypes ?? false, privacy: .public)")
         session.delegate = self
         builder.delegate = self
         self.session = session

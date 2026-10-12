@@ -255,14 +255,23 @@ private extension ActiveSessionView {
             VStack(alignment: .leading, spacing: 0) {
                 Text("诊断 · 心率写入授权：\(Self.authorizationText(env.sessionManager.heartRateShareStatus))")
                 Text("心率回调 \(env.sessionManager.heartRateDeliveries) 次 · 错误：\(env.sessionManager.lastErrorText ?? "无")")
+                Text("数据源含心率：\(Self.boolText(env.sessionManager.heartRateInCollectedTypes))")
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
-            .lineLimit(3)
+            .lineLimit(4)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, SetmioTokens.Spacing.gutter)
         }
         #endif
+    }
+
+    static func boolText(_ value: Bool?) -> String {
+        switch value {
+        case .some(true): "是"
+        case .some(false): "否"
+        case .none: "未知"
+        }
     }
 
     #if canImport(HealthKit)
