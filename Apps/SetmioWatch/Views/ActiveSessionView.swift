@@ -228,7 +228,11 @@ private struct EffortRatingSheet: View {
 extension WatchEnvironment {
     var sessionManagerHeartRateText: String {
         #if canImport(HealthKit)
-        return sessionManager.heartRate.map { SetmioFormat.bpm($0) } ?? "-- bpm"
+        if let bpm = sessionManager.heartRate { return SetmioFormat.bpm(bpm) }
+        // HealthKit never reports a declined read, but it shows up as "cannot see the all-day heart rate": say so
+        // instead of a silent "-- bpm" (the fix is in the iPhone Health app: 共享 → App → Setmio → 心率).
+        if sessionManager.canReadRecentHeartRate == false { return "心率未授权" }
+        return "-- bpm"
         #else
         return "-- bpm"
         #endif
@@ -256,7 +260,7 @@ private extension ActiveSessionView {
                 Text("诊断 · 心率写入授权：\(Self.authorizationText(env.sessionManager.heartRateShareStatus))")
                 Text("心率回调 \(env.sessionManager.heartRateDeliveries) 次 · 错误：\(env.sessionManager.lastErrorText ?? "无")")
                 Text("数据源含心率：\(Self.boolText(env.sessionManager.heartRateInCollectedTypes)) · 读取请求：\(Self.requestStatusText(env.sessionManager.heartRateReadRequestStatus))")
-                Text("统计查询心率：\(env.sessionManager.polledHeartRate.map { String(format: "%.0f bpm", $0) } ?? "无")")
+                Text("统计查询心率：\(env.sessionManager.polledHeartRate.map { String(format: "%.0f bpm", $0) } ?? "无") · 能读到近24小时心率：\(Self.boolText(env.sessionManager.canReadRecentHeartRate))")
             }
             .font(.caption2)
             .foregroundStyle(.secondary)

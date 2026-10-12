@@ -135,4 +135,82 @@ final class WatchChecklistUITests: XCTestCase {
         attachScreen("hr-t50")
         attachText("hr-t50-hierarchy", app.debugDescription)
     }
+
+    /// Heart-rate probe from a CLEAN start: first end any session that is still running (a recovered one skips `start`,
+    /// so it never runs the authorization check or detects the data source), then start a new one and wait 45 s.
+    @MainActor
+    func testWatchHeartRateFreshStart() throws {
+        let app = XCUIApplication()
+        app.launch()
+        Thread.sleep(forTimeInterval: 3)
+
+        // 1. End whatever is running.
+        if app.buttons["结束"].waitForExistence(timeout: 6) {
+            attachScreen("fresh-0-running-found")
+            app.buttons["结束"].tap()
+            Thread.sleep(forTimeInterval: 2)
+            let discard = app.buttons["不评分结束"]
+            if discard.waitForExistence(timeout: 6) {
+                discard.tap()
+                Thread.sleep(forTimeInterval: 6)
+            }
+        }
+        Thread.sleep(forTimeInterval: 3)
+
+        // 2. If a leftover unfinished session is offered, it is not what we want to measure: say so and stop here.
+        if app.buttons["继续训练"].waitForExistence(timeout: 4) {
+            attachScreen("fresh-1-leftover-offered")
+            attachText("fresh-1-note", "an unfinished session is still offered; ending it needs a product decision, stopping")
+            XCTFail("a leftover unfinished session is still offered on the start screen")
+            return
+        }
+
+        // 3. Start fresh.
+        let start = app.buttons["开始计划训练"]
+        for _ in 0..<6 where !start.isHittable {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 1)
+        }
+        XCTAssertTrue(start.waitForExistence(timeout: 5), "start button should be reachable on a clean start")
+        start.tap()
+        Thread.sleep(forTimeInterval: 5)
+        attachScreen("fresh-2-t05")
+        XCTAssertTrue(app.buttons["结束"].waitForExistence(timeout: 10), "active session screen")
+
+        Thread.sleep(forTimeInterval: 45)
+        attachScreen("fresh-3-t50")
+        attachText("fresh-3-hierarchy", app.debugDescription)
+    }
+
+    /// Ends whatever workout is running on the watch, capturing every step, so later tests start clean.
+    @MainActor
+    func testWatchEndRunningWorkout() throws {
+        let app = XCUIApplication()
+        app.launch()
+        Thread.sleep(forTimeInterval: 3)
+        attachScreen("end-0-launch")
+
+        let end = app.buttons["结束"]
+        guard end.waitForExistence(timeout: 6) else {
+            attachText("end-note", "no running workout found (no 结束 button)")
+            return
+        }
+        end.tap()
+        Thread.sleep(forTimeInterval: 3)
+        attachScreen("end-1-after-end-tap")
+        attachText("end-1-hierarchy", app.debugDescription)
+
+        let discard = app.buttons["不评分结束"]
+        if !discard.isHittable {
+            for _ in 0..<4 where !discard.isHittable {
+                app.swipeUp()
+                Thread.sleep(forTimeInterval: 1)
+            }
+        }
+        attachScreen("end-2-before-discard")
+        if discard.waitForExistence(timeout: 5) { discard.tap() }
+        Thread.sleep(forTimeInterval: 8)
+        attachScreen("end-3-after-discard")
+        attachText("end-3-hierarchy", app.debugDescription)
+    }
 }

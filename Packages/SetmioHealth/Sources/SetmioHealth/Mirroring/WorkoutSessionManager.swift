@@ -48,6 +48,9 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
     /// Whether the system would still ask for heart-rate read access (`.shouldRequest`) or has already handled the
     /// request (`.unnecessary`, granted or denied: HealthKit does not say which). nil before the first start.
     public private(set) var heartRateReadRequestStatus: HKAuthorizationRequestStatus?
+    /// Whether this app can see ANY heart-rate sample from the last 24 hours. The watch records heart rate all day, so
+    /// "no" means heart-rate READ access was not granted (HealthKit never says so directly). nil before the first check.
+    public private(set) var canReadRecentHeartRate: Bool?
     /// The most recent heart rate the builder reports through `statistics(for:)`, polled once a second and independent
     /// of the delegate callbacks. If this has a value while `heartRateDeliveries` is 0, the delegate is the problem.
     public private(set) var polledHeartRate: BeatsPerMinute?
@@ -268,6 +271,25 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
             heartRateReadRequestStatus = status
         } catch {
             recordError("heartRateAuthorization", error.localizedDescription)
+        }
+        await probeHeartRateReadAccess()
+    }
+
+    /// Looks for one heart-rate sample from the last 24 hours. A read-authorized app sees the watch's all-day samples;
+    /// an app whose read access was declined sees none, so the result tells the two cases apart.
+    private func probeHeartRateReadAccess() async {
+        let heartRate = HKQuantityType(.heartRate)
+        let since = Date().addingTimeInterval(-24 * 3600)
+        let descriptor = HKSampleQueryDescriptor(
+            predicates: [.quantitySample(type: heartRate, predicate: HKQuery.predicateForSamples(withStart: since, end: nil))],
+            sortDescriptors: [],
+            limit: 1
+        )
+        do {
+            canReadRecentHeartRate = try await descriptor.result(for: store).isEmpty == false
+        } catch {
+            canReadRecentHeartRate = nil
+            recordError("heartRateReadProbe", error.localizedDescription)
         }
     }
 
