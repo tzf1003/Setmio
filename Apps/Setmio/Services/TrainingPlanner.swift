@@ -9,16 +9,43 @@ struct TrainingPlanner: Sendable {
     let store: SetmioStore
     let engine: ProgressionEngine
     let modulator: ReadinessModulator
+    /// Sessions tagged as test data are left out of progression, feedback and rotation. Nil means nothing is excluded.
+    let testData: TestDataRegistry?
 
     /// Sets history passed to the engine per exercise (≈ 10 sessions of 4–5 sets).
     static let historySetLimit = 60
     /// Recent sessions whose feedback the engine sees.
     static let feedbackSessionLimit = 5
 
-    init(store: SetmioStore, engine: ProgressionEngine = ProgressionEngine(), modulator: ReadinessModulator = ReadinessModulator()) {
+    init(
+        store: SetmioStore,
+        engine: ProgressionEngine = ProgressionEngine(),
+        modulator: ReadinessModulator = ReadinessModulator(),
+        testData: TestDataRegistry? = nil
+    ) {
         self.store = store
         self.engine = engine
         self.modulator = modulator
+        self.testData = testData
+    }
+
+    /// The newest `count` items that `isTagged` does not flag, in the order `fetch` returns them (newest first).
+    /// `fetch(limit)` returns at most `limit` newest items. The window doubles until enough untagged items are found
+    /// or the store has no more, so a run of tagged rows never shortens the history the engine sees.
+    static func firstUntagged<T>(
+        _ count: Int,
+        fetch: (Int) async throws -> [T],
+        isTagged: (T) -> Bool
+    ) async throws -> [T] {
+        var window = count
+        while true {
+            let batch = try await fetch(window)
+            let kept = batch.filter { !isTagged($0) }
+            if kept.count >= count || batch.count < window {
+                return Array(kept.prefix(count))
+            }
+            window *= 2
+        }
     }
 
     /// Starts a new mesocycle from `program` (deactivating any other) and returns it.
@@ -76,13 +103,25 @@ struct TrainingPlanner: Sendable {
 
     // MARK: Private
 
+    /// IDs of sessions tagged as test data; empty when there is no registry.
+    private func testSessionIDs() async -> Set<SetmioCore.ID<LoggedSession>> {
+        guard let testData else { return [] }
+        return await testData.testSessionIDs()
+    }
+
     private func buildPlan(day: DayKey, mesocycle: Mesocycle, program: ProgramTemplate, calendar: Calendar) async throws -> PlannedSession {
-        // Program-day rotation: the number of sessions completed since the mesocycle started.
+        let excluded = await testSessionIDs()
+
+        // Program-day rotation: the number of sessions completed since the mesocycle started (test data not counted).
         let range = mesocycle.startDay.startOfDay(calendar: calendar)...day.startOfDay(calendar: calendar)
-        let completed = try await store.loggedSessions(in: range).filter { $0.end != nil }
+        let completed = try await store.loggedSessions(in: range).filter { $0.end != nil && !excluded.contains($0.id) }
         let programDay = program.days[completed.count % program.days.count]
 
-        let feedback = try await store.loggedSessions(limit: Self.feedbackSessionLimit).compactMap(\.feedback)
+        let feedback = try await Self.firstUntagged(
+            Self.feedbackSessionLimit,
+            fetch: { try await store.loggedSessions(limit: $0) },
+            isTagged: { excluded.contains($0.id) }
+        ).compactMap(\.feedback)
         let recentScores = try await store
             .readiness(from: day.adding(days: -5, calendar: calendar), to: day.adding(days: -1, calendar: calendar))
             .reversed()
@@ -92,7 +131,11 @@ struct TrainingPlanner: Sendable {
         var exercises: [PlannedExercise] = []
         for prescription in programDay.prescriptions {
             guard let exercise = try await store.exercise(id: prescription.exerciseID) else { continue }
-            let sets = try await store.recentSets(exerciseID: prescription.exerciseID, limit: Self.historySetLimit)
+            let sets = try await Self.firstUntagged(
+                Self.historySetLimit,
+                fetch: { try await store.recentSets(exerciseID: prescription.exerciseID, limit: $0) },
+                isTagged: { excluded.contains($0.sessionID) }
+            )
             let history = ExerciseHistory(sets: sets, feedback: feedback, recentReadinessScores: Array(recentScores))
             exercises.append(engine.plan(prescription: prescription, exercise: exercise, history: history, meso: meso))
         }
