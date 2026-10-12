@@ -26,6 +26,13 @@ packages:
     path: Packages/SetmioAI
   SetmioUI:
     path: Packages/SetmioUI
+  # Exercise library data (AGPL-3.0, see Packages/SetmioCatalogue/NOTICE.md). iPhone app only: the watch does not link it.
+  SetmioCatalogue:
+    path: Packages/SetmioCatalogue
+  # Body map for the exercise library (MIT, melihcolpan/MuscleMap). No dependencies of its own.
+  MuscleMap:
+    url: https://github.com/melihcolpan/MuscleMap
+    from: 1.9.0
 
 targets:
   Setmio:
@@ -43,6 +50,8 @@ targets:
         product: SetmioHealthTesting
       - package: SetmioAI
       - package: SetmioUI
+      - package: SetmioCatalogue
+      - package: MuscleMap
       - target: SetmioWatch
       - target: SetmioWidgets
     info:

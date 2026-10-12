@@ -27,6 +27,7 @@ struct TrainingView: View {
     var body: some View {
         NavigationStack {
             List {
+                librarySection
                 mesocycleSection
                 todaySection
                 watchSection
@@ -58,6 +59,18 @@ struct TrainingView: View {
     }
 
     // MARK: Sections
+
+    private var librarySection: some View {
+        Section {
+            NavigationLink {
+                ExerciseLibraryView()
+            } label: {
+                Label("动作库", systemImage: "figure.strengthtraining.traditional")
+            }
+        } footer: {
+            Text("5,600+ 个动作，可按肌群在人体图上选择，也可按器械筛选。")
+        }
+    }
 
     private var mesocycleSection: some View {
         Section("训练周期") {

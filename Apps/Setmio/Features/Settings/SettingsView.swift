@@ -167,6 +167,7 @@ struct SettingsView: View {
     private var aboutSection: some View {
         Section("关于") {
             LabeledContent("版本", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
+            NavigationLink("开源许可") { LicensesView() }
             Text("健康衍生数据只保存在本机，不进入 iCloud。本 App 不提供医疗建议；用药相关内容请与医生讨论。")
                 .font(SetmioTokens.Typography.footnote)
                 .foregroundStyle(.secondary)
