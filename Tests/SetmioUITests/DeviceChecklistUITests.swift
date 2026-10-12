@@ -674,4 +674,61 @@ final class DeviceChecklistUITests: XCTestCase {
         attachScreen("watchapp-available")
         attachText("watchapp-available-hierarchy", watch.debugDescription)
     }
+
+    /// Item 4 exploration: walk Health -> Browse -> 心肺 -> 心率变异性 -> add data, capturing each screen's buttons.
+    /// Nothing is saved: the flow stops at the add-data form.
+    @MainActor
+    func testItem4ExploreHealthAddHRV() throws {
+        XCUIApplication().terminate()
+        let health = XCUIApplication(bundleIdentifier: "com.apple.Health")
+        health.terminate()
+        health.launch()
+        Thread.sleep(forTimeInterval: 3)
+
+        func snapshot(_ name: String) {
+            attachScreen(name)
+            let buttons = health.buttons.allElementsBoundByIndex.prefix(40).map { "\($0.label) | \($0.identifier)" }
+            attachText(name + "-buttons", buttons.joined(separator: "\n"))
+        }
+
+        health.buttons.matching(identifier: "UIA.Health.Tab.Browse").firstMatch.tap()
+        Thread.sleep(forTimeInterval: 2)
+        snapshot("h4-1-browse")
+
+        let heart = health.staticTexts["心肺"].firstMatch
+        if heart.waitForExistence(timeout: 5) { heart.tap() }
+        Thread.sleep(forTimeInterval: 2)
+        snapshot("h4-2-heart")
+
+        for _ in 0..<5 where !health.staticTexts["心率变异性"].firstMatch.exists {
+            health.swipeUp()
+            Thread.sleep(forTimeInterval: 1)
+        }
+        let hrv = health.staticTexts["心率变异性"].firstMatch
+        if hrv.waitForExistence(timeout: 5) { hrv.tap() }
+        Thread.sleep(forTimeInterval: 2)
+        snapshot("h4-3-hrv")
+
+        let add = health.buttons["添加数据"].firstMatch
+        if add.waitForExistence(timeout: 5) { add.tap() }
+        Thread.sleep(forTimeInterval: 2)
+        snapshot("h4-4-add-form")
+        attachText("h4-4-hierarchy", health.debugDescription)
+    }
+
+    /// Reads Settings -> 数据 (上次同步 / 上次导入 / 本地记录) without changing anything. Used before and after a manual step.
+    @MainActor
+    func testReadSyncStatus() throws {
+        let app = XCUIApplication()
+        app.activate()
+        let tab = app.tabBars.buttons["设置"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 30), "main tabs should show (is the phone unlocked?)")
+        tab.tap()
+        Thread.sleep(forTimeInterval: 3)
+        let labels = app.staticTexts.allElementsBoundByIndex
+            .map(\.label)
+            .filter { $0.contains("同步") || $0.contains("导入") || $0.contains("本地记录") }
+        attachText("sync-status", labels.joined(separator: "\n") + "\n(read at \(Date()))")
+        attachScreen("sync-status-screen")
+    }
 }
