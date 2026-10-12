@@ -56,7 +56,7 @@ M5 打磨与收尾
 | 2 | 三处可空 `@Attribute(.unique)` | **已确认并移除标注**：多行 nil 不冲突、非 nil 仍去重；`ModelContainerTests.nilUniqueValuesDoNotCollide` |
 | 3 | `AppEnvironment.swift`（`@ModelActor` 线程） | **已确认并处理**：`SetmioStore` 的任务在**调用方是主 actor 时跑在主线程**（与创建线程无关），后台调用方则不在主线程。`HealthSyncService` 的 60 天聚合/评分改在 `Task.detached` 内执行；`StoreExecutorTests` 记录该行为 |
 | 4 | `WorkoutWriter.swift`（effort 样本） | **改为稳妥写法并移除标注**：先 `store.save(sample)` 再 `relateWorkoutEffortSample`（若后者自带保存则幂等）。真机验证见 M4 清单“健身 App 里 effort 为 7” |
-| 5 | `HapticsController.swift`（抬腕/息屏震动） | **保留**：只能在手表上观察。无论结果如何，本地通知兜底都会在休息结束时响，不会静默 |
+| 5 | `HapticsController.swift`（抬腕/息屏震动） | **已确认（真机，2026-10-12）**：抬腕和放下手腕两种情况下，剩 10 秒与归零都震动；本地通知兜底保留作为保险。代码中的 `// VERIFY` 注释可移除 |
 | 6 | `ImagePreprocessor.swift`（EXIF/GPS） | **保留**：属阶段 2（拍照识别），本阶段不使用 |
 | 7 | `MedicationReader.swift`（用药 API，5 处） | **保留**：属阶段 2（减肥针记录），当前为返回空的桩；本 goal 不扩展减肥针功能 |
 

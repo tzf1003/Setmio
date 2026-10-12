@@ -10,9 +10,9 @@ import UserNotifications
 /// Rest-timer haptics: taps on the wrist while the app is frontmost, and a local notification as the fallback
 /// when the wrist is down during the workout session.
 ///
-/// VERIFY (kept on purpose — can only be observed on a watch): whether `WKInterfaceDevice.play` is delivered while the
-/// wrist is down and the app is in the background of a running `HKWorkoutSession`. Either way the scheduled
-/// notification fires, so the rest end is never silent; M4 device step "休息计时归零手表震动" settles which path is used.
+/// Confirmed on a real Apple Watch (2026-10-12, docs/DEVICE_LOG.md): `WKInterfaceDevice.play` is delivered at 10 s before
+/// the end and at zero both with the wrist raised and with it down, inside a running `HKWorkoutSession`. The scheduled
+/// notification stays as a safety net, so the end of a rest is never silent.
 @MainActor
 final class HapticsController {
     enum Cue: Sendable {

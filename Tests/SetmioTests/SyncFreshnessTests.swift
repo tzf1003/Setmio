@@ -12,11 +12,12 @@ struct SyncFreshnessTests {
         #expect(freshness.isStale(lastSyncedAt: nil, now: now))
     }
 
-    @Test("10 分钟内不算过期，超过才算（边界：恰好 10 分钟不算）")
+    @Test("1 分钟内不算过期，超过才算（边界：恰好 60 秒不算）；3 分钟前的同步必须刷新（真机上曾因阈值过长而没刷新）")
     func boundary() {
+        #expect(!freshness.isStale(lastSyncedAt: now.addingTimeInterval(-10), now: now))
         #expect(!freshness.isStale(lastSyncedAt: now.addingTimeInterval(-60), now: now))
-        #expect(!freshness.isStale(lastSyncedAt: now.addingTimeInterval(-600), now: now))
-        #expect(freshness.isStale(lastSyncedAt: now.addingTimeInterval(-601), now: now))
+        #expect(freshness.isStale(lastSyncedAt: now.addingTimeInterval(-61), now: now))
+        #expect(freshness.isStale(lastSyncedAt: now.addingTimeInterval(-3 * 60), now: now))
         #expect(freshness.isStale(lastSyncedAt: now.addingTimeInterval(-3 * 3600), now: now))
     }
 

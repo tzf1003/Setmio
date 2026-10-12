@@ -6,9 +6,11 @@ import Foundation
 /// it is opened: if the last sync is older than `maxAge` it refreshes in the background and the screen shows
 /// 「刷新中」 until it finishes.
 struct SyncFreshness: Sendable, Equatable {
-    /// Older than this, the data counts as stale. Ten minutes: a night's HRV and sleep do not change faster than that,
-    /// and opening the app repeatedly in a short time should not re-run a 60-day aggregation each time.
-    var maxAge: TimeInterval = 10 * 60
+    /// Older than this, the data counts as stale. One minute: a refresh only pulls new samples through the anchors and
+    /// recomputes the last two days, so it is cheap, and the user expects data added in Health a few minutes ago to
+    /// show up when they come back (10 minutes was too long: a 3-minute-old sync did not refresh on device). The limit
+    /// only stops flicking between apps from starting a sync each time.
+    var maxAge: TimeInterval = 60
 
     func isStale(lastSyncedAt: Date?, now: Date) -> Bool {
         guard let lastSyncedAt else { return true }
