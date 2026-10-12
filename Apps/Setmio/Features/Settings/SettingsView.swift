@@ -40,6 +40,7 @@ struct SettingsView: View {
             Form {
                 healthSection
                 dataSection
+                TestDataSection()
                 proxySection
                 profileSection
                 aboutSection
