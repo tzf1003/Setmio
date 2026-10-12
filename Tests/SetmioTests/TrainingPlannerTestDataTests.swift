@@ -119,6 +119,26 @@ struct TrainingPlannerTestDataTests {
         let untaggedPlan = try #require(try await f.planner.plan(for: later, now: later.date(atHour: 8, calendar: calendar), calendar: calendar))
         #expect(untaggedPlan.dayNameZH == f.program.days[1].nameZH, "an untagged finished session advances the rotation")
     }
+
+    @Test("已存的计划保持不变，直到丢弃后按当前历史重建")
+    func discardedPlanIsRebuiltFromCurrentHistory() async throws {
+        let f = try await makeFixture()
+        try await f.planner.startMesocycle(program: f.program, startDay: day1)
+        let day2 = day1.adding(days: 1, calendar: calendar)
+        let stored = try #require(try await f.planner.plan(for: day2, now: day2.date(atHour: 8, calendar: calendar), calendar: calendar))
+        #expect(stored.dayNameZH == f.program.days[0].nameZH)
+
+        // A finished session on day 1 appears after day 2's plan was stored.
+        let start = day1.date(atHour: 18, calendar: calendar)
+        try await f.store.upsertLoggedSession(LoggedSession(start: start, end: start.addingTimeInterval(3600), origin: .phone))
+        let kept = try #require(try await f.planner.plan(for: day2, now: day2.date(atHour: 9, calendar: calendar), calendar: calendar))
+        #expect(kept.dayNameZH == stored.dayNameZH, "the stored plan is not rebuilt by itself")
+
+        #expect(try await f.planner.discardStoredPlan(for: day2))
+        #expect(try await f.planner.discardStoredPlan(for: day2) == false, "nothing is left to discard the second time")
+        let rebuilt = try #require(try await f.planner.plan(for: day2, now: day2.date(atHour: 10, calendar: calendar), calendar: calendar))
+        #expect(rebuilt.dayNameZH == f.program.days[1].nameZH)
+    }
 }
 
 @Suite("TrainingPlanner 取最近的非测试记录")

@@ -92,6 +92,18 @@ struct TrainingPlanner: Sendable {
         return modulator.modulate(base, readiness: readiness, categories: categories, increments: increments)
     }
 
+    /// Drops the stored plan for `day` so the next `plan(for:)` builds it again from the current history (a plan is
+    /// stored once per day, so tag changes do not reach it otherwise). Returns whether a stored plan was removed.
+    @discardableResult
+    func discardStoredPlan(for day: DayKey) async throws -> Bool {
+        guard let mesocycle = try await store.activeMesocycle(),
+              let stored = try await store.plannedSession(for: day, mesocycleID: mesocycle.id) else {
+            return false
+        }
+        try await store.deletePlannedSession(id: stored.id)
+        return true
+    }
+
     /// Exercise names for a plan, for views that render it.
     func exerciseNames(for plan: PlannedSession) async throws -> [SetmioCore.ID<Exercise>: String] {
         var names: [SetmioCore.ID<Exercise>: String] = [:]
