@@ -59,5 +59,7 @@ M5 打磨与收尾
 | 5 | `HapticsController.swift`（抬腕/息屏震动） | **已确认（真机，2026-10-12）**：抬腕和放下手腕两种情况下，剩 10 秒与归零都震动；本地通知兜底保留作为保险。代码中的 `// VERIFY` 注释可移除 |
 | 6 | `ImagePreprocessor.swift`（EXIF/GPS） | **保留**：属阶段 2（拍照识别），本阶段不使用 |
 | 7 | `MedicationReader.swift`（用药 API，5 处） | **保留**：属阶段 2（减肥针记录），当前为返回空的桩；本 goal 不扩展减肥针功能 |
+| 8 | `RestTimerActivityController.swift`（意图拉起的新进程能否看到已有的 Live Activity） | **已确认并移除标注（真机，2026-10-12）**：灵动岛上的暂停、+30 秒、跳过都在后台新进程里生效 |
+| 9 | `HealthWorkoutDeleter.swift`（从手机删除“健康”里的训练） | **保留，待真机确认**：手机写入的训练应能删除；手表 App 写入的训练预期会被系统拒绝（来源不同），需用户在“健康”里手动删。代码按“删后重读”统计，不会谎报成功 |
 
 其他需真机验证、但不对应具体代码标注的：后台投递在锁屏下能打开数据库（文件保护 `.completeUntilFirstUserAuthentication`）、镜像会话能后台拉起 iOS App、Live Activity 暂停态显示与按钮回传、手机不可达时 WatchConnectivity 兜底不重复。

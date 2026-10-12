@@ -92,7 +92,6 @@ final class RestTimerActivityController {
         }
     }
 
-    // VERIFY: on device, an intent-launched process sees the live activity in `Activity.activities` straight away.
     /// The activity this controller drives. In a process that has none (a Live Activity button launches the app in
     /// the background as a new process), adopts the app's live activity: its `content` carries the timer and the
     /// labels, so `lastContent` is restored from it. Synchronous, because `currentTimer` is a property.
