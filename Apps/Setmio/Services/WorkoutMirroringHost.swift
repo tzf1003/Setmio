@@ -25,7 +25,7 @@ final class WorkoutMirroringHost {
     private(set) var lastMessageAt: Date?
     private(set) var lastError: String?
     private(set) var setsReceived = 0
-    /// Bumped right after each watch-originated store write (setLogged, setDeleted, sessionEnded), so views reload.
+    /// Bumped right after each watch-originated store write (setLogged, setDeleted, sessionEnded, sessionDiscarded), so views reload.
     private(set) var watchEventCount = 0
     /// True while a watch workout is mirrored to this phone (set on attach, cleared when the session closes).
     private(set) var isWatchMirroring = false
@@ -94,6 +94,14 @@ final class WorkoutMirroringHost {
                 try await reply(.ack(ids: [session.id.rawValue] + session.sets.map(\.id.rawValue)), via: channel)
                 await activity.end()
                 activeSessionID = nil
+
+            case .sessionDiscarded(let id):
+                // Abandoned on the watch: delete the session and its sets so they stop feeding the progression plan.
+                try await store.deleteLoggedSession(id: id)
+                watchEventCount += 1
+                if activeSessionID == id { activeSessionID = nil }
+                await activity.end()
+                try await reply(.ack(ids: [id.rawValue]), via: channel)
 
             case .restTimerChanged(let timer):
                 // The watch is the source of truth: it corrects whatever the phone showed optimistically.
