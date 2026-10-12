@@ -210,6 +210,7 @@ struct SettingsView: View {
                 Text(reason).font(SetmioTokens.Typography.footnote).foregroundStyle(.secondary)
             }
         }
+        LabeledContent("上次回到前台检查", value: env.lastForegroundCheck ?? "本次启动以来没有")
         if let at = env.lastBackgroundUpdateAt {
             LabeledContent("上次后台更新", value: SetmioFormat.date(at, calendar: env.calendar) + " " + SetmioFormat.clock(at, calendar: env.calendar))
         } else {

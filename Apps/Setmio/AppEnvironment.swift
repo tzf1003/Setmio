@@ -220,9 +220,24 @@ final class AppEnvironment {
     /// limit. The work runs off the main actor (see `HealthSyncService.runOffMain`) and the UI shows 「刷新中」 through
     /// `syncService.isSyncing` until it finishes. Never runs while the demo source is replacing the real one.
     func refreshIfStale(now: Date = Date()) async {
-        guard isBootstrapped, !syncService.isSyncing else { return }
-        guard SyncFreshness().isStale(lastSyncedAt: syncService.lastSyncedAt, now: now) else { return }
+        guard isBootstrapped else { return noteForegroundCheck("未初始化，跳过", at: now) }
+        guard !syncService.isSyncing else { return noteForegroundCheck("正在同步，跳过", at: now) }
+        let freshness = SyncFreshness()
+        guard freshness.isStale(lastSyncedAt: syncService.lastSyncedAt, now: now) else {
+            let age = syncService.lastSyncedAt.map { Int(now.timeIntervalSince($0)) }
+            return noteForegroundCheck("数据新鲜（\(age.map(String.init) ?? "?") 秒前同步，阈值 \(Int(freshness.maxAge)) 秒）", at: now)
+        }
+        noteForegroundCheck("已过期，开始刷新", at: now)
         await syncNow()
+        noteForegroundCheck("刷新完成", at: Date())
+    }
+
+    /// The last foreground check and what it decided, shown in Settings so a "did not refresh" report can be told apart
+    /// from "never checked" (the scene-phase callback did not fire) on a device.
+    private(set) var lastForegroundCheck: String?
+
+    private func noteForegroundCheck(_ outcome: String, at date: Date) {
+        lastForegroundCheck = SetmioFormat.clock(date, calendar: calendar) + " · " + outcome
     }
 
     /// Full sync followed by a plan refresh (the "同步健康数据" button and pull-to-refresh).

@@ -7,6 +7,7 @@ import SwiftData
 @main
 struct SetmioApp: App {
     @State private var environment: AppEnvironment
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let env = AppEnvironment()
@@ -22,5 +23,10 @@ struct SetmioApp: App {
         }
         .environment(environment)
         .modelContainer(environment.container)
+        .onChange(of: scenePhase) { _, phase in
+            // Opening the app is when stale data gets refreshed: HealthKit cannot wake us while the phone is locked.
+            // Observed at the App level, the canonical place for the scene phase of the whole app.
+            if phase == .active { Task { await environment.refreshIfStale() } }
+        }
     }
 }
