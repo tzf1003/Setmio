@@ -3,6 +3,7 @@ import SwiftUI
 /// Five tabs per 方案.md §7.2: 今日 / 训练 / 营养 / 用药 / 设置. 营养 and 用药 are V1 placeholders.
 struct RootView: View {
     @Environment(AppEnvironment.self) private var env
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         TabView {
@@ -27,6 +28,10 @@ struct RootView: View {
             set: { _ in }
         )) {
             OnboardingView()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Opening the app is when stale data gets refreshed: HealthKit cannot wake us while the phone is locked.
+            if phase == .active { Task { await env.refreshIfStale() } }
         }
         .overlay(alignment: .top) {
             if let error = env.startupError {

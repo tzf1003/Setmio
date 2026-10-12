@@ -45,6 +45,12 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
     /// Whether the live data source the builder was given lists heart rate in `typesToCollect` (nil before the first start).
     /// If this is false the builder never collects heart rate, whatever the sensor does.
     public private(set) var heartRateInCollectedTypes: Bool?
+    /// Whether the system would still ask for heart-rate read access (`.shouldRequest`) or has already handled the
+    /// request (`.unnecessary`, granted or denied: HealthKit does not say which). nil before the first start.
+    public private(set) var heartRateReadRequestStatus: HKAuthorizationRequestStatus?
+    /// The most recent heart rate the builder reports through `statistics(for:)`, polled once a second and independent
+    /// of the delegate callbacks. If this has a value while `heartRateDeliveries` is 0, the delegate is the problem.
+    public private(set) var polledHeartRate: BeatsPerMinute?
     /// Write (share) status for heart rate. HealthKit does not report read status: a denied read looks like no data.
     public var heartRateShareStatus: HKAuthorizationStatus {
         store.authorizationStatus(for: HKQuantityType(.heartRate))
@@ -85,6 +91,8 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = .traditionalStrengthTraining
         configuration.locationType = .indoor
+
+        await ensureHeartRateAuthorization()
 
         let session = try HKWorkoutSession(healthStore: store, configuration: configuration)
         let builder = session.associatedWorkoutBuilder()
@@ -246,6 +254,23 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
 
     // MARK: Private
 
+    /// Asks for heart-rate read and write access again if the system has not handled the request. A watch workout
+    /// only gets heart-rate statistics from the builder when read access was granted, and HealthKit never reports a
+    /// denied read, so the request status is the only signal available (`.shouldRequest` = never answered).
+    private func ensureHeartRateAuthorization() async {
+        let heartRate = HKQuantityType(.heartRate)
+        do {
+            var status = try await store.statusForAuthorizationRequest(toShare: [heartRate], read: [heartRate])
+            if status == .shouldRequest {
+                try await store.requestAuthorization(toShare: [heartRate], read: [heartRate])
+                status = try await store.statusForAuthorizationRequest(toShare: [heartRate], read: [heartRate])
+            }
+            heartRateReadRequestStatus = status
+        } catch {
+            recordError("heartRateAuthorization", error.localizedDescription)
+        }
+    }
+
     private func recordError(_ step: String, _ message: String) {
         lastErrorText = "\(step)：\(message)"
         heartRateLog.error("\(step, privacy: .public) error: \(message, privacy: .public)")
@@ -277,7 +302,11 @@ public final class WorkoutSessionManager: NSObject, HKWorkoutSessionDelegate, HK
         elapsedTicker = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
-                if let builder = self.builder { self.elapsed = builder.elapsedTime(at: Date()) }
+                if let builder = self.builder {
+                    self.elapsed = builder.elapsedTime(at: Date())
+                    let heartRateType = HKQuantityType(.heartRate)
+                    self.polledHeartRate = builder.statistics(for: heartRateType)?.mostRecentQuantity()?.doubleValue(for: HealthTypes.heartRateUnit)
+                }
                 try? await Task.sleep(for: .seconds(1))
             }
         }

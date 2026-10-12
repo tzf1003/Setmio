@@ -205,6 +205,15 @@ final class AppEnvironment {
         await refreshTodayPlan()
     }
 
+    /// Called when the app comes to the foreground: refreshes only if the last sync is older than the freshness
+    /// limit. The work runs off the main actor (see `HealthSyncService.runOffMain`) and the UI shows 「刷新中」 through
+    /// `syncService.isSyncing` until it finishes. Never runs while the demo source is replacing the real one.
+    func refreshIfStale(now: Date = Date()) async {
+        guard isBootstrapped, !syncService.isSyncing else { return }
+        guard SyncFreshness().isStale(lastSyncedAt: syncService.lastSyncedAt, now: now) else { return }
+        await syncNow()
+    }
+
     /// Full sync followed by a plan refresh (the "同步健康数据" button and pull-to-refresh).
     func syncNow() async {
         await syncService.syncToday()

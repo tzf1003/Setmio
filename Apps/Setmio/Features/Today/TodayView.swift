@@ -40,8 +40,18 @@ struct TodayView: View {
     @ViewBuilder
     private var readinessCard: some View {
         VStack(alignment: .leading, spacing: SetmioTokens.Spacing.md) {
-            Text("今日准备度")
-                .font(SetmioTokens.Typography.title)
+            HStack {
+                Text("今日准备度")
+                    .font(SetmioTokens.Typography.title)
+                Spacer()
+                // Data is already on screen: say it is being refreshed instead of hiding the update.
+                if sync.isSyncing, sync.readiness != nil {
+                    HStack(spacing: SetmioTokens.Spacing.xs) {
+                        ProgressView().controlSize(.small)
+                        Text("刷新中").font(SetmioTokens.Typography.footnote).foregroundStyle(.secondary)
+                    }
+                }
+            }
 
             switch sync.readiness {
             case .some(.score(let score)):
