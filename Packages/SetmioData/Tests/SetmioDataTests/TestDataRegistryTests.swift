@@ -85,8 +85,11 @@ struct TestDataRegistryTests {
         try await registry.mark(session)
         #expect(await registry.testSessionIDs() == [session])
 
-        let sidecar = url.deletingLastPathComponent().appending(path: "test-data.corrupt.json", directoryHint: .notDirectory)
-        #expect(try String(contentsOf: sidecar, encoding: .utf8) == "not json {")
+        let copies = try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)
+            .filter { $0.hasPrefix("test-data.corrupt-") }
+        #expect(copies.count == 1)
+        let copy = url.deletingLastPathComponent().appending(path: try #require(copies.first), directoryHint: .notDirectory)
+        #expect(try String(contentsOf: copy, encoding: .utf8) == "not json {")
     }
 
     @Test("文件无法读取（路径是目录）时读作空，写入失败而不是覆盖")

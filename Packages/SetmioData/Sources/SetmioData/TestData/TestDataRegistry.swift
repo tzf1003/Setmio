@@ -106,8 +106,10 @@ public actor TestDataRegistry {
         case unreadable
     }
 
-    private var corruptFileURL: URL {
-        fileURL.deletingLastPathComponent().appending(path: "test-data.corrupt.json", directoryHint: .notDirectory)
+    /// A new, unique name each time, so an earlier preserved copy is never overwritten.
+    private func makeCorruptCopyURL() -> URL {
+        fileURL.deletingLastPathComponent()
+            .appending(path: "test-data.corrupt-\(UUID().uuidString).json", directoryHint: .notDirectory)
     }
 
     private func load() -> Loaded {
@@ -134,7 +136,7 @@ public actor TestDataRegistry {
             file = existing
         case .corrupt(let data):
             do {
-                try data.write(to: corruptFileURL, options: .atomic)
+                try data.write(to: makeCorruptCopyURL(), options: .atomic)
             } catch {
                 throw TestDataRegistryError.couldNotPreserveCorruptFile
             }
