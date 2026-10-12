@@ -29,6 +29,10 @@ final class AppEnvironment {
 
     let container: ModelContainer
     let store: SetmioStore
+    /// Which sessions are test data (device testing). A small local file beside the store, not part of SwiftData.
+    let testData: TestDataRegistry
+    /// Deletes the tagged test sessions and their Health workouts (Settings → 测试数据).
+    let testDataCleaner: TestDataCleaner
     /// Non-nil when the on-disk container could not be opened and the app fell back to an in-memory one.
     private(set) var startupError: String?
 
@@ -89,6 +93,8 @@ final class AppEnvironment {
     /// Written only by the background-delivery callback, so a foreground sync does not move it. The settings screen
     /// shows it to tell "delivery never fired" from "fired but the UI did not refresh".
     fileprivate(set) var lastBackgroundUpdateAt: Date?
+    /// Bumped whenever test tags or test mode change, so the Training tab and Settings reload.
+    private(set) var testDataRevision = 0
 
     /// Whether an Apple Watch workout is mirrored to this phone right now (always false without HealthKit).
     var isWatchMirroring: Bool {
@@ -138,6 +144,8 @@ final class AppEnvironment {
         // StoreExecutorTests), so heavy store work is started from detached tasks / actors, never from here.
         let store = SetmioStore(modelContainer: container)
         self.store = store
+        let testData = TestDataRegistry(fileURL: TestDataRegistry.defaultFileURL())
+        self.testData = testData
 
         #if canImport(HealthKit)
         let healthStore = HKHealthStore()
@@ -148,10 +156,13 @@ final class AppEnvironment {
         // after a background launch triggered by the watch.
         self.receiver = MirroringSessionReceiver(store: healthStore)
         let source: any HealthSampleSource = realSource
+        let workoutDeleter: any HealthWorkoutDeleting = HealthKitWorkoutDeleter(store: healthStore)
         #else
         let source: any HealthSampleSource = FakeHealthSampleSource.demo(endingOn: DayKey(Date()))
+        let workoutDeleter: any HealthWorkoutDeleting = UnavailableWorkoutDeleter()
         #endif
         self.healthSource = source
+        self.testDataCleaner = TestDataCleaner(store: store, registry: testData, health: workoutDeleter)
 
         let realService = HealthSyncService(store: store, source: source, anchors: AnchorStore(), calculator: readinessCalculator)
         self.realSyncService = realService
@@ -164,7 +175,7 @@ final class AppEnvironment {
             await backgroundReport.didUpdate()
         }
 
-        self.planner = TrainingPlanner(store: store, engine: progressionEngine, modulator: readinessModulator)
+        self.planner = TrainingPlanner(store: store, engine: progressionEngine, modulator: readinessModulator, testData: testData)
 
         #if canImport(HealthKit)
         let host = WorkoutMirroringHost(receiver: receiver, store: store, activity: activityController)
@@ -322,6 +333,29 @@ final class AppEnvironment {
         await refreshTodayPlan()
     }
 
+    // MARK: - Test data
+
+    /// Tags `sessionID` as test data while test mode is on. Called for every session this phone creates or receives.
+    func tagIfTestMode(_ sessionID: SetmioCore.ID<LoggedSession>) async {
+        do {
+            if try await testData.markIfTestMode(sessionID) {
+                testDataRevision += 1
+            }
+        } catch {
+            lastError = "无法标记测试训练：\(error.localizedDescription)"
+        }
+    }
+
+    /// Call after an explicit change to the tags (toggle, delete, mark-all). Reloads the Training tab and Settings, and
+    /// rebuilds today's plan from the new history. Skipped while a workout runs, so the watch keeps the plan it has.
+    func testDataDidChange() async {
+        testDataRevision += 1
+        let active = (try? await testDataCleaner.hasActiveWorkout(watchMirroring: isWatchMirroring)) ?? true
+        guard !active else { return }
+        _ = try? await planner.discardStoredPlan(for: today)
+        await refreshTodayPlan()
+    }
+
     // MARK: - AI
 
     private func reconfigureProxy() {
@@ -352,6 +386,10 @@ final class AppEnvironment {
         }
         host.connectivityReply = { [weak self] envelope in
             self?.connectivityBridge.transfer(envelope)
+        }
+        // Watch sessions received while test mode is on are tagged as test data.
+        host.onSessionReceived = { [weak self] sessionID in
+            Task { await self?.tagIfTestMode(sessionID) }
         }
         #endif
     }
