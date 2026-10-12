@@ -1,5 +1,6 @@
 import SwiftUI
 import SetmioCore
+import SetmioHealth
 import SetmioUI
 
 /// Today: readiness gauge with its components and flags (or the "数据不足" state), today's planned session with
@@ -183,6 +184,18 @@ struct TodayView: View {
         .setmioCard()
     }
 
+    /// "上次更新 17:21 · 完整导入 3 条（17:19）". The first time is when the data last changed by ANY path (a full sync or a
+    /// background-delivery update); the report only covers full syncs, so it is secondary. Showing the report's time alone
+    /// made a fresh background update look like "nothing happened".
+    static func updateCaption(lastSyncedAt: Date?, report: ImportReport?, calendar: Calendar) -> String? {
+        var parts: [String] = []
+        if let lastSyncedAt { parts.append("上次更新 \(SetmioFormat.clock(lastSyncedAt, calendar: calendar))") }
+        if let report {
+            parts.append("完整导入 \(report.totalImported) 条（\(SetmioFormat.clock(report.finishedAt, calendar: calendar))）")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     static func summary(of exercise: PlannedExercise) -> String {
         guard let first = exercise.sets.first else { return "无组" }
         let load = first.targetLoad.map { SetmioFormat.compactKg($0) + " × " } ?? ""
@@ -205,8 +218,8 @@ struct TodayView: View {
             .buttonStyle(.setmioPrimary)
             .disabled(sync.isSyncing)
 
-            if let report = sync.lastReport {
-                Text("上次导入 \(report.totalImported) 条样本 · \(SetmioFormat.clock(report.finishedAt, calendar: env.calendar))")
+            if let caption = Self.updateCaption(lastSyncedAt: sync.lastSyncedAt, report: sync.lastReport, calendar: env.calendar) {
+                Text(caption)
                     .font(SetmioTokens.Typography.footnote)
                     .foregroundStyle(.secondary)
             }
